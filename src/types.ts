@@ -97,6 +97,7 @@ export interface RadioStation {
   name: string;
   genre: string;
   streamUrl: string;
+  fallbackUrl?: string;
   logo: string;
   country: string; // Country filter tag, e.g. "philippines", "japan", "usa", "uk", "france", "germany", "australia"
 }
