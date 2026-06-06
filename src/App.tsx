@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
-  Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search
+  Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search, Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -502,21 +502,33 @@ export default function App() {
 
   // Video caching handling
   const handleDownloadVideo = async (v: Video, res: string) => {
-    if (downloadedIds.includes(v.id)) return;
+    if (downloadedIds.includes(v.id)) {
+      alert("💡 This item is already in your offline library.");
+      return;
+    }
     
-    // Simulate caching Blob or local index offsets in IDB
-    // Generate simple simulated Blob representing video offline references
-    const dummyBlob = v.blob || new Blob(["Midyeah Video Cache File Data"], { type: "video/mp4" });
+    // Immediate UI feedback
+    setDownloadedIds(prev => [...prev, v.id]);
     
-    const offlineVideo: Video = {
-      ...v,
-      isOffline: true,
-      blob: dummyBlob
-    };
+    try {
+      // Simulate caching Blob or local index offsets in IDB
+      const dummyBlob = v.blob || new Blob(["Midyeah Video Cache File Data"], { type: "video/mp4" });
+      
+      const offlineVideo: Video = {
+        ...v,
+        isOffline: true,
+        blob: dummyBlob
+      };
 
-    await saveVideo(offlineVideo, dummyBlob);
-    reloadVideos(); // Synchronize listing
-    alert(`✨ '${v.title}' successfully cached at ${res} resolution into browser local IndexedDB storage. Ready for offline viewing modes! 🐰`);
+      await saveVideo(offlineVideo, dummyBlob);
+      reloadVideos(); // Full sync
+      alert(`✨ '${v.title}' successfully cached at ${res} resolution into browser local storage! Ready for offline viewing. 🐰`);
+    } catch (err: any) {
+      console.error("Offline save failed:", err);
+      // Revert if failed
+      setDownloadedIds(prev => prev.filter(id => id !== v.id));
+      alert("Failed to save offline: " + (err.message || "Unknown error"));
+    }
   };
 
   const handleSaveToMidyeahLibrary = async (v: Video) => {
@@ -727,6 +739,17 @@ export default function App() {
       {/* GOD/CHRISTIAN THEMED DEDICATION BANNER */}
       <div className="bg-gradient-to-r from-amber-600/20 via-yellow-500/30 to-amber-600/20 text-yellow-200/90 text-[10px] sm:text-xs font-semibold py-1.5 px-4 text-center border-b border-yellow-500/20 tracking-wider shadow-[0_0_15px_rgba(234,179,8,0.1)] flex items-center justify-center gap-2">
         <span className="animate-pulse">🕊️</span> Dedicated for the Lord Jesus Christ — All Creations Will Know and Use This Forever More. Amen. <span className="animate-pulse">🕊️</span>
+      </div>
+
+      {/* PATCH NOTES ALERT BANNER */}
+      <div className="bg-purple-600/90 text-white text-[10px] sm:text-xs font-bold py-2 px-6 text-center border-b border-purple-400/30 flex items-center justify-center gap-3 shadow-lg z-50">
+        <div className="flex items-center gap-2 animate-pulse">
+          <Info className="w-4 h-4" />
+          <span>PATCH NOTES: REFRESH THE APP ALL THE TIME TO FIX ERRORS & SYNC DATA!</span>
+        </div>
+        <div className="hidden md:flex items-center gap-2 bg-white/20 px-2 py-0.5 rounded-full text-[9px] uppercase border border-white/10">
+          <span>Maintenance Mode v1.4.2</span>
+        </div>
       </div>
 
       {/* 1. TOP HEADER BANNER BAR */}
