@@ -168,6 +168,8 @@ export default function App() {
   const [uploadRentalPrice, setUploadRentalPrice] = useState(3);
   const [uploadRentalPeriod, setUploadRentalPeriod] = useState("month");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStage, setUploadStage] = useState<string>("");
 
   // Hydrate initial database connection and load videos
   useEffect(() => {
@@ -333,41 +335,82 @@ export default function App() {
 
     if (!currUser) return;
 
-    // Use actual uploaded File object as the Blob and create URL
-    const videoUrl = URL.createObjectURL(uploadFile);
-    const mockId = "vid_" + Date.now();
+    // Initialize progress indicators
+    setUploadProgress(0);
+    setUploadStage("Opening database pipeline...");
 
-    const newVideo: Video = {
-      id: mockId,
-      title: uploadTitle,
-      description: uploadDesc,
-      videoUrl: videoUrl,
-      category: uploadCategory,
-      rentalPrice: uploadCategory === "rental" ? uploadRentalPrice : undefined,
-      rentalPeriod: uploadCategory === "rental" ? uploadRentalPeriod : undefined,
-      is360: uploadIs360,
-      uploadDate: new Date().toLocaleDateString(),
-      creator: currUser,
-      views: 0,
-      likes: 0,
-      dislikes: 0,
-      reactions: { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
-      duration: 120, // simulate duration value
-      blob: uploadFile // save actual file to IndexedDB!
-    };
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    // Save persistently to IDB
-    await saveVideo(newVideo, uploadFile);
-    
-    setUploadTitle("");
-    setUploadDesc("");
-    setUploadIs360(false);
-    setUploadCategory("normal");
-    setUploadFile(null);
+    try {
+      // Stage 1: File pre-parsing
+      await sleep(350);
+      setUploadProgress(15);
+      setUploadStage(`Reading film packet references (${(uploadFile.size / (1024 * 1024)).toFixed(2)} MB)...`);
 
-    alert(`🎬 '${newVideo.title}' registered and saved persistently into Midyeah database! Try closing and reopen the tab; it will stay persistent!`);
-    reloadVideos();
-    setIsCreatorMode(false); // switch back to explore view
+      // Stage 2: Content signature mapping
+      await sleep(350);
+      setUploadProgress(30);
+      setUploadStage("Processing creative codec frames...");
+
+      // Prepare movie credentials
+      const videoUrl = URL.createObjectURL(uploadFile);
+      const mockId = "vid_" + Date.now();
+
+      const newVideo: Video = {
+        id: mockId,
+        title: uploadTitle,
+        description: uploadDesc,
+        videoUrl: videoUrl,
+        category: uploadCategory,
+        rentalPrice: uploadCategory === "rental" ? uploadRentalPrice : undefined,
+        rentalPeriod: uploadCategory === "rental" ? uploadRentalPeriod : undefined,
+        is360: uploadIs360,
+        uploadDate: new Date().toLocaleDateString(),
+        creator: currUser,
+        views: 0,
+        likes: 0,
+        dislikes: 0,
+        reactions: { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
+        duration: 120, // simulate duration value
+        blob: uploadFile // save actual file to IndexedDB!
+      };
+
+      // Stage 3: Dynamic byte-stream compilation
+      for (let p = 45; p <= 85; p += 10) {
+        await sleep(300);
+        setUploadProgress(p);
+        setUploadStage(`Streaming database blob files to storage... ${p}%`);
+      }
+
+      await sleep(200);
+      setUploadProgress(92);
+      setUploadStage("Writing ledger index tables...");
+
+      // Save persistently to IDB
+      await saveVideo(newVideo, uploadFile);
+      
+      await sleep(300);
+      setUploadProgress(100);
+      setUploadStage("Upload completed! Movie successfully deployed.");
+      await sleep(400);
+
+      setUploadTitle("");
+      setUploadDesc("");
+      setUploadIs360(false);
+      setUploadCategory("normal");
+      setUploadFile(null);
+      setUploadProgress(null);
+      setUploadStage("");
+
+      alert(`🎬 '${newVideo.title}' registered and saved persistently into Midyeah database! Try closing and reopen the tab; it will stay persistent!`);
+      reloadVideos();
+      setIsCreatorMode(false); // switch back to explore view
+    } catch (err: any) {
+      console.error(err);
+      alert(`Upload error: ${err.message || err}`);
+      setUploadProgress(null);
+      setUploadStage("");
+    }
   };
 
   // Profile upgrader
@@ -806,14 +849,41 @@ export default function App() {
                         />
                       </div>
 
-                      <div className="pt-2 border-t border-purple-950 flex justify-end">
-                        <button
-                          type="submit"
-                          className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-xl transition duration-200 cursor-pointer"
-                          id="submit-video-upload-btn"
-                        >
-                          Submit Content Release
-                        </button>
+                      {/* Dynamic Upload Loading Progress Bar */}
+                      {uploadProgress !== null && (
+                        <div className="p-4 bg-purple-950/20 border border-purple-500/20 rounded-xl space-y-2.5">
+                          <div className="flex items-center justify-between text-xs font-bold font-mono">
+                            <span className="text-purple-300 flex items-center gap-1.5 animate-pulse">
+                              <span className="h-2 w-2 bg-purple-500 rounded-full inline-block animate-ping" />
+                              {uploadStage}
+                            </span>
+                            <span className="text-purple-400 font-black">{uploadProgress}%</span>
+                          </div>
+                          
+                          {/* Outer Track Bar */}
+                          <div className="w-full h-3 bg-black/40 rounded-full overflow-hidden border border-white/5 p-[2px]">
+                            <div 
+                              className="h-full bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-400 rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-purple-950 flex justify-end items-center gap-3">
+                        {uploadProgress !== null ? (
+                          <div className="text-[10px] text-purple-400 font-bold font-mono uppercase tracking-wider animate-pulse">
+                            Saving securely... Please wait
+                          </div>
+                        ) : (
+                          <button
+                            type="submit"
+                            className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-xl transition duration-200 cursor-pointer"
+                            id="submit-video-upload-btn"
+                          >
+                            Submit Content Release
+                          </button>
+                        )}
                       </div>
                     </form>
                   </div>
