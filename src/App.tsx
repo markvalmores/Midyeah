@@ -591,23 +591,23 @@ export default function App() {
       setUploadProgress(100);
       setUploadStage("Completed!");
       
-      setUploadTitle("");
-      setUploadDesc("");
-      setUploadIs360(false);
-      setUploadCategory("normal");
-      setUploadCountry("philippines");
-      setUploadFile(null);
-      setUploadThumbnailMode("auto");
-      setCustomThumbnailFile(null);
-      setThumbnailPreviewUrl("");
-      setUploadProgress(null);
-      setUploadStage("");
-
-      alert(`🎬 '${newVideo.title}' registered and being saved persistently in the background!`);
-      setIsCreatorMode(false); // switch back to explore view
+      // Delay reset so user sees 100% completion
+      setTimeout(() => {
+        setUploadTitle("");
+        setUploadDesc("");
+        setUploadIs360(false);
+        setUploadCategory("normal");
+        setUploadCountry("philippines");
+        setUploadFile(null);
+        setUploadThumbnailMode("auto");
+        setCustomThumbnailFile(null);
+        setThumbnailPreviewUrl("");
+        setUploadProgress(null);
+        setUploadStage("");
+        setIsCreatorMode(false); // switch back to explore view
+      }, 1500);
     } catch (err: any) {
       console.error(err);
-      alert(`Upload error: ${err.message || err}`);
       setUploadProgress(null);
       setUploadStage("");
     }
@@ -1289,7 +1289,7 @@ export default function App() {
                                 {currentVideo.title}
                                 {currentVideo.category === 'movie' && <span className="bg-red-500/20 text-red-500 p-1.5 rounded-lg border border-red-500/30" title="Movie"><Tv className="w-4 h-4" /></span>}
                                 {currentVideo.category === 'rental' && <span className="bg-purple-500/20 text-purple-400 p-1.5 rounded-lg border border-purple-500/30" title="Rental"><Tv className="w-4 h-4" /></span>}
-                                {(!currentVideo.category || currentVideo.category === 'standard') && <span className="bg-green-500/20 text-green-500 p-1.5 rounded-lg border border-green-500/30" title="Standard Video"><VideoIcon className="w-4 h-4" /></span>}
+                                {(!currentVideo.category || currentVideo.category === 'standard' || currentVideo.category === 'normal') && <span className="bg-green-500/20 text-green-500 p-1.5 rounded-lg border border-green-500/30" title="Standard Video"><VideoIcon className="w-4 h-4" /></span>}
                               </h2>
                               <button onClick={() => setCurrentVideo(null)} className="text-gray-400 hover:text-white px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl transition text-xs font-bold uppercase cursor-pointer">
                                 Close Player
@@ -1552,7 +1552,7 @@ export default function App() {
                                 <h3 className="font-bold text-xs text-gray-100 line-clamp-1 group-hover:text-purple-300 transition shrink-0 flex items-center gap-1.5">
                                   {vid.category === 'movie' && <span className="bg-red-500/20 text-red-500 p-1 rounded-md border border-red-500/30 shrink-0" title="Movie"><Tv className="w-3 h-3" /></span>}
                                   {vid.category === 'rental' && <span className="bg-purple-500/20 text-purple-400 p-1 rounded-md border border-purple-500/30 shrink-0" title="Rental"><Tv className="w-3 h-3" /></span>}
-                                  {(!vid.category || vid.category === 'standard') && <span className="bg-green-500/20 text-green-500 p-1 rounded-md border border-green-500/30 shrink-0" title="Standard Video"><VideoIcon className="w-3 h-3" /></span>}
+                                  {(!vid.category || vid.category === 'standard' || vid.category === 'normal') && <span className="bg-green-500/20 text-green-500 p-1 rounded-md border border-green-500/30 shrink-0" title="Standard Video"><VideoIcon className="w-3 h-3" /></span>}
                                   <span className="truncate">{vid.title}</span>
                                 </h3>
                                 <p className="text-[10px] text-purple-400 font-semibold uppercase mt-0.5">

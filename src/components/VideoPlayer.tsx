@@ -7,7 +7,7 @@ import React, { useRef, useState, useEffect } from "react";
 import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, Minimize2,
   Tv, Subtitles, Compass, RefreshCw, ThumbsUp, ThumbsDown, Share2,
-  Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast
+  Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast, FolderHeart
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Video, VideoSub } from "../types";
