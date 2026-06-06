@@ -30,7 +30,6 @@ import DiscordChat from "./components/DiscordChat";
 import PlaylistsTab from "./components/PlaylistsTab";
 import SupportTab from "./components/SupportTab";
 import SearchTab from "./components/SearchTab";
-import VideoPage from "./components/VideoPage";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search">("home");
@@ -1282,18 +1281,104 @@ export default function App() {
                           </div>
                         </div>
                       ) : currentVideo ? (
-                        <VideoPage
-                          video={currentVideo}
-                          onDownload={handleDownloadVideo}
-                          onSaveToLibrary={handleSaveToMidyeahLibrary}
-                          isDownloaded={downloadedIds.includes(currentVideo.id)}
-                          comments={comments}
-                          onAddComment={handleAddComment}
-                          setCommentInput={setCommentInput}
-                          commentInput={commentInput}
-                          currUser={currUser}
-                          onClose={() => setCurrentVideo(null)}
-                        />
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                          {/* Rich Player node */}
+                          <div className="lg:col-span-2 space-y-4">
+                            <div className="flex items-center justify-between bg-black/20 p-4 rounded-2xl border border-white/5 mb-4">
+                              <h2 className="text-xl font-bold flex items-center gap-3">
+                                {currentVideo.title}
+                                {currentVideo.category === 'movie' && <span className="bg-red-500/20 text-red-500 p-1.5 rounded-lg border border-red-500/30" title="Movie"><Tv className="w-4 h-4" /></span>}
+                                {currentVideo.category === 'rental' && <span className="bg-purple-500/20 text-purple-400 p-1.5 rounded-lg border border-purple-500/30" title="Rental"><Tv className="w-4 h-4" /></span>}
+                                {(!currentVideo.category || currentVideo.category === 'standard') && <span className="bg-green-500/20 text-green-500 p-1.5 rounded-lg border border-green-500/30" title="Standard Video"><VideoIcon className="w-4 h-4" /></span>}
+                              </h2>
+                              <button onClick={() => setCurrentVideo(null)} className="text-gray-400 hover:text-white px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl transition text-xs font-bold uppercase cursor-pointer">
+                                Close Player
+                              </button>
+                            </div>
+                            <VideoPlayer
+                              video={currentVideo}
+                              onDownload={handleDownloadVideo}
+                              onSaveToLibrary={handleSaveToMidyeahLibrary}
+                              isDownloaded={downloadedIds.includes(currentVideo.id)}
+                            />
+
+                            {/* PUBLIC COMMENTS SECTION - YouTube styled */}
+                            <div className="bg-[#121214] border border-white/10 p-5 rounded-3xl shadow-xl space-y-4">
+                              <h3 className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-white/5 pb-2">
+                                💬 Public Comments ({comments.length} Sync'd Worldwide)
+                              </h3>
+                              
+                              <form onSubmit={handleAddComment} className="flex gap-3 items-start mt-2">
+                                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-purple-500/30">
+                                  <img 
+                                    src={currUser?.avatarUrl} 
+                                    className="w-full h-full object-cover" 
+                                    onError={(e)=>(e.target as any).src="https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40"} 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Add a public comment..."
+                                    value={commentInput}
+                                    onChange={(e) => setCommentInput(e.target.value)}
+                                    className="bg-[#1C1C1F] border border-white/10 rounded-xl p-2.5 px-3 text-xs text-white w-full outline-none focus:border-purple-500"
+                                    id="add-comment-input-grid"
+                                  />
+                                  <div className="flex justify-end pr-1">
+                                    <button
+                                      type="submit"
+                                      disabled={!commentInput.trim()}
+                                      className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold p-1.5 px-4 rounded-xl text-[10px] uppercase tracking-wide transition cursor-pointer"
+                                      id="add-comment-submit-btn"
+                                    >
+                                      Comment
+                                    </button>
+                                  </div>
+                                </div>
+                              </form>
+
+                              {/* Comments lists log */}
+                              <div className="space-y-3 mt-4 max-h-[250px] overflow-y-auto pr-1 select-none scrollbar-thin">
+                                {isLoadingComments ? (
+                                  <p className="text-[10px] text-zinc-500 text-center py-4">Streaming and verifying comments from global nodes...</p>
+                                ) : comments.length === 0 ? (
+                                  <p className="text-[10px] text-zinc-500 text-center py-4">No public comments yet on this video. Be the first to share your thoughts!</p>
+                                ) : (
+                                  comments.map((comment) => (
+                                    <div key={comment.id} className="flex gap-3 text-xs p-2.5 bg-[#1C1C1F]/40 hover:bg-[#1C1C1F]/60 border border-transparent hover:border-white/5 rounded-xl transition">
+                                      <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 border border-white/5">
+                                        <img src={comment.avatarUrl} className="w-full h-full object-cover" onError={(e)=>(e.target as any).src="https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40"} referrerPolicy="no-referrer" />
+                                      </div>
+                                      <div className="flex-1 space-y-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-purple-300">{comment.username}</span>
+                                          <span className="text-[9px] text-gray-500">{new Date(comment.timestamp).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-gray-300 leading-relaxed">{comment.text}</p>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Companion games launcher widget beside player */}
+                          <div className="space-y-4">
+                            <Games />
+                            
+                            <div className="bg-[#121214] border border-white/10 p-5 rounded-2xl shadow-xl text-xs select-none">
+                              <h3 className="font-bold text-white uppercase text-[10px] tracking-wide mb-1 flex items-center gap-1.5 text-purple-400">
+                                🛸 PICTURE IN PICTURE BROADCASTER
+                              </h3>
+                              <p className="text-slate-300 leading-relaxed">
+                                Feel free to scroll down to explore more movies or play casual retro games! The PiP overlay falling window keeps synchronizing background play smoothly.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         /* Welcome Showcase Banner */
                         <div className="bg-gradient-to-br from-[#1C1C1F] via-[#121214] to-black border border-white/10 rounded-3xl p-6 relative overflow-hidden select-none">
@@ -1435,16 +1520,6 @@ export default function App() {
                             >
                               {/* Video thumbnail cover visual */}
                               <div className="aspect-video bg-black relative flex items-center justify-center overflow-hidden">
-                                {vid.category === "rental" ? (
-                                  <span className="absolute top-2 left-2 bg-amber-600/95 font-bold text-[9px] text-amber-50 rounded px-1.5 py-0.5 shadow-md z-10 uppercase tracking-wider">
-                                    Rental ${vid.rentalPrice}
-                                  </span>
-                                ) : vid.category === "movie" ? (
-                                  <span className="absolute top-2 left-2 bg-blue-600/95 font-bold text-[9px] text-blue-50 rounded px-1.5 py-0.5 shadow-md z-10 uppercase tracking-wider">
-                                    Cinema Movie
-                                  </span>
-                                ) : null}
-
                                 {vid.is360 && (
                                   <span className="absolute top-2 right-2 bg-purple-600/95 font-bold text-[9px] text-white rounded px-1.5 py-0.5 shadow-md z-10">
                                     360° VR
@@ -1474,10 +1549,13 @@ export default function App() {
 
                               {/* Title description details */}
                               <div className="p-3">
-                                <h3 className="font-bold text-xs text-gray-100 line-clamp-1 group-hover:text-purple-300 transition shrink-0">
-                                  {vid.title}
+                                <h3 className="font-bold text-xs text-gray-100 line-clamp-1 group-hover:text-purple-300 transition shrink-0 flex items-center gap-1.5">
+                                  {vid.category === 'movie' && <span className="bg-red-500/20 text-red-500 p-1 rounded-md border border-red-500/30 shrink-0" title="Movie"><Tv className="w-3 h-3" /></span>}
+                                  {vid.category === 'rental' && <span className="bg-purple-500/20 text-purple-400 p-1 rounded-md border border-purple-500/30 shrink-0" title="Rental"><Tv className="w-3 h-3" /></span>}
+                                  {(!vid.category || vid.category === 'standard') && <span className="bg-green-500/20 text-green-500 p-1 rounded-md border border-green-500/30 shrink-0" title="Standard Video"><VideoIcon className="w-3 h-3" /></span>}
+                                  <span className="truncate">{vid.title}</span>
                                 </h3>
-                                <p className="text-[10px] text-purple-400 font-semibold uppercase">
+                                <p className="text-[10px] text-purple-400 font-semibold uppercase mt-0.5">
                                   {vid.creator?.channelName}
                                 </p>
                                 <div className="flex items-center justify-between text-[9px] text-gray-500 mt-1">
