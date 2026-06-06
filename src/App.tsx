@@ -6,12 +6,17 @@
 import React, { useState, useEffect } from "react";
 import {
   Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles,
-  ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell
+  ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
+  Trash2, Check, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import { Video, UserProfile } from "./types";
-import { getAllVideos, saveVideo, openDB, getProfile, saveProfile } from "./db";
+import { 
+  getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
+  clearAllVideos, saveComment, getVideoComments 
+} from "./db";
+import { Comment } from "./types";
 
 import Mascot from "./components/Mascot";
 import VideoPlayer from "./components/VideoPlayer";
@@ -43,6 +48,32 @@ export default function App() {
   // Video datasets
   const [videosList, setVideosList] = useState<Video[]>([]);
   const [downloadedIds, setDownloadedIds] = useState<string[]>([]);
+  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
+  const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
+
+  const handleDeleteSingleVideo = async (id: string) => {
+    try {
+      await deleteVideo(id);
+      if (currentVideo?.id === id) {
+        setCurrentVideo(null);
+      }
+      setDeletingVideoId(null);
+      reloadVideos();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteAllVideosAction = async () => {
+    try {
+      await clearAllVideos();
+      setCurrentVideo(null);
+      setShowConfirmDeleteAll(false);
+      reloadVideos();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Console controllers styles
   const [consoleBrandInput, setConsoleBrandInput] = useState<"xbox" | "playstation" | "switch" | "touch">("touch");
@@ -50,6 +81,78 @@ export default function App() {
   // Category view triggers
   const [categoryFilter, setCategoryFilter] = useState<"all" | "movie" | "rental">("all");
   const [sortBy, setSortBy] = useState<"date" | "alphabet">("date");
+
+  // Real-time Global Comments Section
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentInput, setCommentInput] = useState("");
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Sync / Stream Video from Firestore chunks globally
+  const handlePlayVideo = async (vid: Video) => {
+    if (vid.isOffline || vid.blob || vid.videoUrl.startsWith("blob:") || vid.videoUrl.startsWith("data:")) {
+      setCurrentVideo(vid);
+    } else {
+      setIsStreaming(true);
+      try {
+        const { downloadGlobalVideoChunks } = await import("./db");
+        const blob = await downloadGlobalVideoChunks(vid.id);
+        const url = URL.createObjectURL(blob);
+        const hydratedVideo: Video = {
+          ...vid,
+          videoUrl: url,
+          blob: blob
+        };
+        setCurrentVideo(hydratedVideo);
+      } catch (err) {
+        console.warn("Failed to stream global chunks, using fallback url:", err);
+        setCurrentVideo(vid);
+      } finally {
+        setIsStreaming(false);
+      }
+    }
+    window.scrollTo({ top: 120, behavior: "smooth" });
+  };
+
+  // Fetch comments for any selected video
+  useEffect(() => {
+    if (currentVideo) {
+      setIsLoadingComments(true);
+      getVideoComments(currentVideo.id).then((items) => {
+        setComments(items || []);
+        setIsLoadingComments(false);
+      }).catch((err) => {
+        console.error("Could not fetch comments:", err);
+        setIsLoadingComments(false);
+      });
+    } else {
+      setComments([]);
+    }
+  }, [currentVideo]);
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentInput.trim() || !currentVideo || !currUser) return;
+
+    const newComment: Comment = {
+      id: "comment_" + Date.now(),
+      videoId: currentVideo.id,
+      username: currUser.username || "Guest Watcher",
+      avatarUrl: currUser.avatarUrl || "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+      text: commentInput,
+      timestamp: new Date().toISOString(),
+      likes: 0,
+      replies: []
+    };
+
+    try {
+      await saveComment(newComment);
+      setComments(prev => [newComment, ...prev]);
+      setCommentInput("");
+    } catch (err) {
+      console.error("Failed to post comment:", err);
+    }
+  };
 
   // Video Upload inputs
   const [uploadTitle, setUploadTitle] = useState("");
@@ -590,15 +693,85 @@ export default function App() {
                     <div className="space-y-6 animate-fade-in">
                       
                       {/* Active Player Row (rendered above list if play icon clicked) */}
-                      {currentVideo ? (
+                      {isStreaming ? (
+                        <div className="flex flex-col items-center justify-center bg-[#121214] border border-white/10 rounded-3xl p-16 h-[380px] w-full text-center space-y-4 animate-pulse">
+                          <div className="h-10 w-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                          <div>
+                            <h3 className="font-extrabold text-xs text-purple-300 uppercase tracking-widest">📡 CONNECTING TO WATCHTOWER NODES</h3>
+                            <p className="text-[10px] text-gray-400 mt-2">Streaming and fusing video segments globally from Firestore chunk clusters...</p>
+                          </div>
+                        </div>
+                      ) : currentVideo ? (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                           {/* Rich Player node */}
-                          <div className="lg:col-span-2">
+                          <div className="lg:col-span-2 space-y-4">
                             <VideoPlayer
                               video={currentVideo}
                               onDownload={handleDownloadVideo}
                               isDownloaded={downloadedIds.includes(currentVideo.id)}
                             />
+
+                            {/* PUBLIC COMMENTS SECTION - YouTube styled */}
+                            <div className="bg-[#121214] border border-white/10 p-5 rounded-3xl shadow-xl space-y-4">
+                              <h3 className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-white/5 pb-2">
+                                💬 Public Comments ({comments.length} Sync'd Worldwide)
+                              </h3>
+                              
+                              <form onSubmit={handleAddComment} className="flex gap-3 items-start mt-2">
+                                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-purple-500/30">
+                                  <img 
+                                    src={currUser?.avatarUrl} 
+                                    className="w-full h-full object-cover" 
+                                    onError={(e)=>(e.target as any).src="https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40"} 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Add a public comment..."
+                                    value={commentInput}
+                                    onChange={(e) => setCommentInput(e.target.value)}
+                                    className="bg-[#1C1C1F] border border-white/10 rounded-xl p-2.5 px-3 text-xs text-white w-full outline-none focus:border-purple-500"
+                                    id="add-comment-input-grid"
+                                  />
+                                  <div className="flex justify-end pr-1">
+                                    <button
+                                      type="submit"
+                                      disabled={!commentInput.trim()}
+                                      className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold p-1.5 px-4 rounded-xl text-[10px] uppercase tracking-wide transition cursor-pointer"
+                                      id="add-comment-submit-btn"
+                                    >
+                                      Comment
+                                    </button>
+                                  </div>
+                                </div>
+                              </form>
+
+                              {/* Comments lists log */}
+                              <div className="space-y-3 mt-4 max-h-[250px] overflow-y-auto pr-1 select-none scrollbar-thin">
+                                {isLoadingComments ? (
+                                  <p className="text-[10px] text-zinc-500 text-center py-4">Streaming and verifying comments from global nodes...</p>
+                                ) : comments.length === 0 ? (
+                                  <p className="text-[10px] text-zinc-500 text-center py-4">No public comments yet on this video. Be the first to share your thoughts!</p>
+                                ) : (
+                                  comments.map((comment) => (
+                                    <div key={comment.id} className="flex gap-3 text-xs p-2.5 bg-[#1C1C1F]/40 hover:bg-[#1C1C1F]/60 border border-transparent hover:border-white/5 rounded-xl transition">
+                                      <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 border border-white/5">
+                                        <img src={comment.avatarUrl} className="w-full h-full object-cover" onError={(e)=>(e.target as any).src="https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40"} referrerPolicy="no-referrer" />
+                                      </div>
+                                      <div className="flex-1 space-y-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-purple-300">{comment.username}</span>
+                                          <span className="text-[9px] text-gray-500">{new Date(comment.timestamp).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-gray-300 leading-relaxed">{comment.text}</p>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
                           </div>
 
                           {/* Companion games launcher widget beside player */}
@@ -674,7 +847,7 @@ export default function App() {
                           </button>
                         </div>
 
-                        <div className="flex items-center gap-2.5 text-xs text-gray-400">
+                        <div className="flex items-center gap-2.5 text-xs text-gray-400 flex-wrap">
                           <span>Sort by:</span>
                           <select
                             value={sortBy}
@@ -685,6 +858,44 @@ export default function App() {
                             <option value="date">📅 Release Time first</option>
                             <option value="alphabet">🔤 Alphabet title first</option>
                           </select>
+
+                          {videosList.length > 0 && (
+                            <div className="relative inline-block ml-2">
+                              {!showConfirmDeleteAll ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowConfirmDeleteAll(true)}
+                                  className="flex items-center gap-1 bg-[#1C1C1F] hover:bg-red-950/20 text-red-400 border border-red-500/20 hover:border-red-500/50 p-1.5 px-3 rounded-xl font-bold transition-all cursor-pointer"
+                                  id="delete-all-btn-trigger"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete All</span>
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-1.5 bg-red-900/90 text-white p-1 px-2 rounded-xl border border-red-600 shadow-md">
+                                  <span className="text-[10px] font-bold select-none whitespace-nowrap">Delete All?</span>
+                                  <button
+                                    type="button"
+                                    onClick={handleDeleteAllVideosAction}
+                                    className="p-1 hover:bg-white/10 rounded-md transition cursor-pointer"
+                                    title="Yes, delete all"
+                                    id="confirm-delete-all-btn"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowConfirmDeleteAll(false)}
+                                    className="p-1 hover:bg-white/10 rounded-md transition cursor-pointer"
+                                    title="Cancel"
+                                    id="cancel-delete-all-btn"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -713,7 +924,7 @@ export default function App() {
                           {getFilteredVideosList().map((vid) => (
                             <div
                               key={vid.id}
-                              onClick={() => { setCurrentVideo(vid); window.scrollTo({ top: 120, behavior: "smooth" }); }}
+                              onClick={() => { handlePlayVideo(vid); }}
                               className="bg-[#121214] border border-white/10 rounded-2xl overflow-hidden group cursor-pointer hover:border-purple-500/30 transition duration-250 shadow-md hover:shadow-xl hover:-translate-y-0.5 flex flex-col justify-between"
                             >
                               {/* Video thumbnail cover visual */}
@@ -752,8 +963,45 @@ export default function App() {
                                   {vid.creator?.channelName}
                                 </p>
                                 <div className="flex items-center justify-between text-[9px] text-gray-500 mt-1">
-                                  <span>{vid.uploadDate}</span>
-                                  {vid.isOffline && <span className="text-emerald-400 font-semibold uppercase">Downloaded Offline</span>}
+                                  <div className="flex items-center gap-1">
+                                    <span>{vid.uploadDate}</span>
+                                    {vid.isOffline && <span className="text-emerald-400 font-semibold uppercase">• Offline</span>}
+                                  </div>
+
+                                  <div onClick={(e) => e.stopPropagation()} className="relative text-xs">
+                                    {deletingVideoId !== vid.id ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setDeletingVideoId(vid.id)}
+                                        className="p-1 text-slate-500 hover:text-red-400 transition cursor-pointer rounded"
+                                        title="Delete Video"
+                                        id={`delete-vid-btn-${vid.id}`}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    ) : (
+                                      <div className="flex items-center gap-1 bg-red-950/80 border border-red-500/30 rounded px-1.5 py-0.5 text-white">
+                                        <span className="text-[8px] font-bold select-none text-[8px]">Delete?</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteSingleVideo(vid.id)}
+                                          className="text-red-400 hover:text-red-300 font-extrabold uppercase text-[8px] cursor-pointer"
+                                          id={`confirm-delete-vid-${vid.id}`}
+                                        >
+                                          Yes
+                                        </button>
+                                        <span className="text-gray-600">|</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setDeletingVideoId(null)}
+                                          className="text-gray-400 hover:text-white text-[8px] cursor-pointer"
+                                          id={`cancel-delete-vid-${vid.id}`}
+                                        >
+                                          No
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>

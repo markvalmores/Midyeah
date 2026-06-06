@@ -6,8 +6,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Hash, MessageSquare, Send, Bell, Settings, HelpCircle, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { getDiscordMessages, saveDiscordMessage } from "../db";
+import { getDiscordMessages, saveDiscordMessage, db } from "../db";
 import { DiscordMessage } from "../types";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export default function DiscordChat() {
   const [activeChannel, setActiveChannel] = useState("general");
@@ -22,41 +23,34 @@ export default function DiscordChat() {
     { id: "games-room", name: "games-room", desc: "Share your Tetris and 2048 high scores 🕹️" }
   ];
 
-  // Fetch from IndexedDB or hydrate initially
+  // Subscribe to real-time worldwide messages in Firestore
   useEffect(() => {
-    getDiscordMessages().then((dbMsgs) => {
-      if (dbMsgs.length > 0) {
-        setMessages(dbMsgs);
-      } else {
-        // Hydrate demo chat
-        const initial: DiscordMessage[] = [
-          {
-            id: "msg1",
-            username: "Mark David Valmores",
-            avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=40&q=40",
-            text: "Hello everyone! Welcome to Midyeah. I pray that this platform blesses you all. God bless our amazing future together!",
-            timestamp: "2026-06-06T06:00:00Z"
-          },
-          {
-            id: "msg2",
-            username: "MidyBunny 🐰",
-            avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
-            text: "Hi! Midy is holding a coffee cup listening to radio station retro beats right now. Cozy vibes! ☕",
-            timestamp: "2026-06-06T06:02:00Z"
-          },
-          {
-            id: "msg3",
-            username: "ObserverGamer",
-            avatarUrl: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=40&q=40",
-            text: "Love how we can play Tetris and Catch Fruit directly below the active streaming player. Extremely unique addition!",
-            timestamp: "2026-06-06T06:05:00Z"
-          }
-        ];
-        // Commit templates to DB
-        initial.forEach(msg => saveDiscordMessage(msg));
-        setMessages(initial);
+    const q = query(collection(db, "discord_messages"), orderBy("timestamp", "asc"));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const msgs: DiscordMessage[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        msgs.push({
+          id: data.id,
+          username: data.username,
+          avatarUrl: data.avatarUrl || "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+          text: data.text || "",
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      });
+      if (msgs.length > 0) {
+        setMessages(msgs);
       }
+    }, (error) => {
+      console.warn("Real-time snapshot failed in some modes, reading offline tables:", error);
+      getDiscordMessages().then((dbMsgs) => {
+        if (dbMsgs.length > 0) {
+          setMessages(dbMsgs);
+        }
+      });
     });
+
+    return () => unsubscribe();
   }, []);
 
   // auto scroll to bottom of chat

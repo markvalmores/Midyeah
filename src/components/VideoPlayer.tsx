@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Video, VideoSub } from "../types";
-import { savePlayOffset, getPlayOffset } from "../db";
+import { savePlayOffset, getPlayOffset, saveVideo } from "../db";
 
 interface VideoPlayerProps {
   video: Video;
@@ -35,7 +35,7 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
   const [isAutoplay, setIsAutoplay] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false); // Wide theatre mode
-  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [showSubtitles, setShowSubtitles] = useState(false);
   const [isAiSubtitle, setIsAiSubtitle] = useState(false);
   const [pipActive, setPipActive] = useState(false);
   const [crashState, setCrashState] = useState(false);
@@ -62,8 +62,16 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
     setIsPlaying(false);
     setCurrentReact(null);
     setHasRated(null);
-    setViewsCount(video.views + 1); // bump views
-    setReactCounts(video.reactions);
+    const newViews = (video.views || 0) + 1;
+    setViewsCount(newViews); // bump views
+    setReactCounts(video.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 });
+
+    // Sync views bump globally
+    const updatedVideo = {
+      ...video,
+      views: newViews
+    };
+    saveVideo(updatedVideo).catch(err => console.warn("Failed to sync views:", err));
 
     // Fetch saved resume time
     getPlayOffset(video.id).then((savedTime) => {
@@ -279,31 +287,62 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
 
   // React handling (Facebook reactions)
   const handleReaction = (reactType: string) => {
+    let freshReacts = { ...reactCounts };
     // toggle active react
     if (currentReact === reactType) {
       setCurrentReact(null);
-      setReactCounts(prev => ({
-        ...prev,
-        [reactType]: Math.max(0, prev[reactType as keyof typeof prev] - 1)
-      }));
+      freshReacts[reactType as keyof typeof freshReacts] = Math.max(0, (freshReacts[reactType as keyof typeof freshReacts] || 0) - 1);
     } else {
       // remove old react if selected
-      const fresh = { ...reactCounts };
       if (currentReact) {
-        fresh[currentReact as keyof typeof fresh] = Math.max(0, fresh[currentReact as keyof typeof fresh] - 1);
+        freshReacts[currentReact as keyof typeof freshReacts] = Math.max(0, (freshReacts[currentReact as keyof typeof freshReacts] || 0) - 1);
       }
-      fresh[reactType as keyof typeof fresh] = (fresh[reactType as keyof typeof fresh] || 0) + 1;
-      setReactCounts(fresh);
+      freshReacts[reactType as keyof typeof freshReacts] = (freshReacts[reactType as keyof typeof freshReacts] || 0) + 1;
       setCurrentReact(reactType);
     }
+    setReactCounts(freshReacts);
+
+    const updatedVideo = {
+      ...video,
+      reactions: freshReacts
+    };
+    saveVideo(updatedVideo).catch(err => console.warn("Failed to sync reaction:", err));
   };
 
   const handleLikeDislike = (type: "like" | "dislike") => {
+    let newLikes = video.likes || 0;
+    let newDislikes = video.dislikes || 0;
+    let nextRated: "like" | "dislike" | null = null;
+
     if (hasRated === type) {
-      setHasRated(null);
+      nextRated = null;
+      if (type === "like") {
+        newLikes = Math.max(0, newLikes - 1);
+      } else {
+        newDislikes = Math.max(0, newDislikes - 1);
+      }
     } else {
-      setHasRated(type);
+      if (hasRated === "like") {
+        newLikes = Math.max(0, newLikes - 1);
+      } else if (hasRated === "dislike") {
+        newDislikes = Math.max(0, newDislikes - 1);
+      }
+      
+      nextRated = type;
+      if (type === "like") {
+        newLikes++;
+      } else {
+        newDislikes++;
+      }
     }
+    setHasRated(nextRated);
+
+    const updatedVideo = {
+      ...video,
+      likes: newLikes,
+      dislikes: newDislikes
+    };
+    saveVideo(updatedVideo).catch(err => console.warn("Failed to sync rating:", err));
   };
 
   // Subtitle custom guess generator toggle

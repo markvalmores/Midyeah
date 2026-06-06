@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User custom channel details and credentials",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "description": "Display user identifier handle" },
+        "email": { "type": "string", "format": "email", "description": "Unique user email address" },
+        "channelName": { "type": "string", "description": "Creative channel brand name" },
+        "channelUrl": { "type": "string", "description": "Unique URL search handle" },
+        "bio": { "type": "string", "description": "Channel biography details" },
+        "avatarUrl": { "type": "string", "description": "User headshot visual image source URL" },
+        "coverUrl": { "type": "string", "description": "User channel cover visual banner source URL" },
+        "subscribersCount": { "type": "integer", "description": "Simulated or actual subscriber milestone ticker" },
+        "gcash": { "type": "string", "description": "GCash mobile wallet withdrawal path mapping" },
+        "paypal": { "type": "string", "description": "PayPal credentials path mapping" }
+      },
+      "required": ["username", "email", "channelName", "channelUrl", "avatarUrl"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "Video metadata representation on the global network",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique globally available UUID mapping" },
+        "title": { "type": "string", "description": "Creative video title metadata" },
+        "description": { "type": "string", "description": "Extended content summary overview" },
+        "videoUrl": { "type": "string", "description": "Asset play fallback link or reconstruction node pointer" },
+        "category": { "type": "string", "enum": ["normal", "movie", "rental"], "description": "Monetization tier category" },
+        "rentalPrice": { "type": "number", "description": "Optional currency pricing modifier" },
+        "rentalPeriod": { "type": "string", "description": "Optional periodic validation tier" },
+        "is360": { "type": "boolean", "description": "Interactive gyroscope visual state tracker" },
+        "uploadDate": { "type": "string", "description": "Localized calendar record anchor" },
+        "creatorEmail": { "type": "string", "description": "Email identifier of the creator" },
+        "creatorName": { "type": "string", "description": "Display brand name of the uploader" },
+        "creatorAvatar": { "type": "string", "description": "Avatar of the uploader" },
+        "views": { "type": "integer", "description": "Consolidated watch ticker" },
+        "likes": { "type": "integer", "description": "User approval metrics" },
+        "dislikes": { "type": "integer", "description": "Dislike metrics" },
+        "duration": { "type": "number", "description": "Length in standard seconds" },
+        "hasVideoData": { "type": "boolean", "description": "Flag indicating if peer-to-peer chunking storage is present in the database" }
+      },
+      "required": ["id", "title", "videoUrl", "category", "uploadDate", "creatorEmail", "duration"]
+    },
+    "VideoChunk": {
+      "title": "VideoChunk",
+      "description": "Fragment representing chunked video binary data streams",
+      "type": "object",
+      "properties": {
+        "index": { "type": "integer", "description": "Ascending fragment compilation anchor" },
+        "data": { "type": "string", "description": "Raw Base64 encoded binary video content segment" }
+      },
+      "required": ["index", "data"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Global user social feedback and chat strings under uploaded videos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Comment ID" },
+        "videoId": { "type": "string", "description": "Belongs to Video ID" },
+        "username": { "type": "string", "description": "Creator display handle" },
+        "avatarUrl": { "type": "string", "description": "Creator profile headshot" },
+        "text": { "type": "string", "description": "Text body feedback details" },
+        "timestamp": { "type": "string", "description": "Calendar capture stamp" },
+        "likes": { "type": "integer", "description": "Consolidated comment approval counter" }
+      },
+      "required": ["id", "videoId", "username", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/profiles/{email}": {
+      "schema": "UserProfile",
+      "description": "User specific custom channel configurations and payout routes"
+    },
+    "/global_videos/{videoId}": {
+      "schema": "Video",
+      "description": "Global directory of creative user video postings"
+    },
+    "/global_videos/{videoId}/chunks/{chunkId}": {
+      "schema": "VideoChunk",
+      "description": "Subcollection housing binary streaming chunks for full serverless global distribution"
+    },
+    "/global_videos/{videoId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Subcollection housing social comments for specific upload entities"
+    }
+  }
+}

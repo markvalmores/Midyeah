@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net: Default-deny all unmapped operations
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helper primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(email) {
+      return isSignedIn() && request.auth.token.email == email;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Form/payload schema validators
+    function isValidUserProfile(data) {
+      return data.username is string && data.username.size() <= 50
+          && data.email is string && data.email.size() <= 100
+          && data.channelName is string && data.channelName.size() <= 100
+          && data.channelUrl is string && data.channelUrl.size() <= 50;
+    }
+
+    function isValidVideo(data) {
+      return data.id is string && data.id.size() <= 128
+          && data.title is string && data.title.size() <= 200
+          && data.videoUrl is string && data.videoUrl.size() <= 2048
+          && data.category in ['normal', 'movie', 'rental']
+          && data.duration is number
+          && data.creatorEmail is string;
+    }
+
+    function isValidVideoChunk(data) {
+      return data.index is int
+          && data.data is string && data.data.size() <= 1100000; // Limit base64 chunk to ~1.1MB
+    }
+
+    function isValidComment(data) {
+      return data.id is string
+          && data.videoId is string
+          && data.username is string && data.username.size() <= 100
+          && data.text is string && data.text.size() <= 10000;
+    }
+
+    // 2. User Profiles mapping
+    match /profiles/{email} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(email) && isValidUserProfile(request.resource.data);
+      allow update: if isSignedIn() && isOwner(email) && isValidUserProfile(request.resource.data);
+      allow delete: if isSignedIn() && isOwner(email);
+    }
+
+    // 3. Global Videos mapping
+    match /global_videos/{videoId} {
+      allow read: if true; // Public list viewing allowed
+      allow create: if isSignedIn() && isValidId(videoId) 
+                    && request.resource.data.creatorEmail == request.auth.token.email
+                    && isValidVideo(request.resource.data);
+      allow update: if isSignedIn() && isValidId(videoId)
+                    && (resource.data.creatorEmail == request.auth.token.email || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'dislikes']))
+                    && isValidVideo(request.resource.data);
+      allow delete: if isSignedIn() && isValidId(videoId) && resource.data.creatorEmail == request.auth.token.email;
+
+      // Chunks subcollection
+      match /chunks/{chunkId} {
+        allow read: if true; // Playback allowed publically
+        allow create, update: if isSignedIn() 
+                              && isValidId(chunkId)
+                              && get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email
+                              && isValidVideoChunk(request.resource.data);
+        allow delete: if isSignedIn() && isValidId(chunkId)
+                      && get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email;
+      }
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true; // Comments can be read globally
+        allow create: if isSignedIn() && isValidId(commentId)
+                      && isValidComment(request.resource.data);
+        allow update, delete: if isSignedIn() && isValidId(commentId)
+                              && (resource.data.username == request.auth.token.name || get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email);
+      }
+    }
+
+  }
+}

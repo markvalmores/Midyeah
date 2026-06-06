@@ -203,51 +203,82 @@ export default function Profile({ profile, onUpdate }: ProfileProps) {
 
       {/* Avatar Holder and Profile Summary */}
       <div className="relative px-6 -mt-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex items-end gap-4">
-          <div 
-            className={`w-24 h-24 rounded-2xl overflow-hidden bg-purple-900 border-4 ${isDragOverAvatar ? "border-purple-500 scale-105" : "border-[#121214]"} shadow-xl relative group transition-all duration-250`}
-            onDragOver={(e) => { e.preventDefault(); setIsDragOverAvatar(true); }}
-            onDragLeave={() => setIsDragOverAvatar(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragOverAvatar(false);
-              if (e.dataTransfer.files?.[0]) {
-                handleAvatarFile(e.dataTransfer.files[0]);
-              }
-            }}
-          >
-            <img
-              src={avatarUrl}
-              alt="Avatar Profile"
-              className="w-full h-full object-cover"
-              onError={(e)=>{(e.target as any).src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"}}
-              referrerPolicy="no-referrer"
-            />
-            <label 
-              htmlFor="avatar-file-upload-input"
-              className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-center p-1"
-            >
-              <Camera className="w-5 h-5 text-purple-300 mb-1 animate-pulse" />
-              <span className="text-[10px] text-purple-200 font-bold select-none leading-none">Upload / Drop</span>
-            </label>
-            <input
-              type="file"
-              id="avatar-file-upload-input"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  handleAvatarFile(e.target.files[0]);
+        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+          <div className="flex flex-col items-center sm:items-start gap-2">
+            <div 
+              className={`w-24 h-24 rounded-2xl overflow-hidden bg-purple-900 border-4 ${isDragOverAvatar ? "border-purple-500 scale-105" : "border-[#121214]"} shadow-xl relative group transition-all duration-250 cursor-pointer`}
+              onDragOver={(e) => { e.preventDefault(); setIsDragOverAvatar(true); }}
+              onDragLeave={() => setIsDragOverAvatar(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOverAvatar(false);
+                if (e.dataTransfer.files?.[0]) {
+                  handleAvatarFile(e.dataTransfer.files[0]);
                 }
               }}
-            />
+              onClick={() => {
+                const el = document.getElementById("avatar-file-upload-input");
+                if (el) el.click();
+              }}
+            >
+              <img
+                src={avatarUrl}
+                alt="Avatar Profile"
+                className="w-full h-full object-cover"
+                onError={(e)=>{(e.target as any).src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"}}
+                referrerPolicy="no-referrer"
+              />
+              <div 
+                className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-center p-1"
+              >
+                <Camera className="w-5 h-5 text-purple-300 mb-1 animate-pulse" />
+                <span className="text-[10px] text-purple-200 font-bold select-none leading-none">Upload / Drop</span>
+              </div>
+              <input
+                type="file"
+                id="avatar-file-upload-input"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    handleAvatarFile(e.target.files[0]);
+                  }
+                }}
+              />
+            </div>
+            
+            {/* Explicit Change Photo Trigger for touch and standard mobile devices */}
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("avatar-file-upload-input");
+                if (el) el.click();
+              }}
+              className="sm:hidden text-[9px] uppercase font-black bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800/40 p-1 px-2.5 rounded-lg flex items-center gap-1 select-none cursor-pointer"
+            >
+              <Camera className="w-3 h-3" />
+              <span>Change Photo</span>
+            </button>
           </div>
-          <div className="mb-1">
-            <h1 className="text-xl font-bold text-white flex items-center gap-1.5">
+          
+          <div className="mb-1 text-center sm:text-left flex flex-col items-center sm:items-start gap-1">
+            <h1 className="text-xl font-bold text-white flex items-center gap-1.5 justify-center sm:justify-start">
               <span>{channelName || "My Channel"}</span>
               {isPartnerApproved && <CheckCircle className="w-4 h-4 text-purple-400 fill-purple-950" />}
             </h1>
             <p className="text-xs text-purple-300 font-mono">@{channelUrl || "midyeah_url"}</p>
+            
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("avatar-file-upload-input");
+                if (el) el.click();
+              }}
+              className="hidden sm:flex text-[9px] uppercase font-black bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800/40 p-1 px-2.5 rounded-lg items-center gap-1 select-none cursor-pointer mt-1"
+            >
+              <Camera className="w-3 h-3" />
+              <span>Change profile picture</span>
+            </button>
           </div>
         </div>
 
