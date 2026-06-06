@@ -571,7 +571,9 @@ export default function App() {
       setUploadStage("Syncing to cloud...");
 
       // Instantly inject the new video so user doesn't need to refresh - BOOM ITS IN MIDYEAH ASAP
-      setVideosList(prev => [newVideo, ...prev]);
+      const localUrl = URL.createObjectURL(uploadFile);
+      const newVideoWithUrl = { ...newVideo, videoUrl: localUrl };
+      setVideosList(prev => [newVideoWithUrl, ...prev]);
       
       // Run saveVideo in the background - do NOT await it so the user isn't blocked
       saveVideo(newVideo, uploadFile, (p) => {
