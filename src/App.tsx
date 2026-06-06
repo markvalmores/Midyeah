@@ -381,11 +381,11 @@ export default function App() {
     e.preventDefault();
     if (verificationCode === authCodeSent) {
       setIsVerifying(true);
-      setVerificationProgress(20);
+      setVerificationProgress(30);
       try {
         // Authenticate inside Firebase Auth system before writing to Firestore
         await authenticateUser(emailInput, passInput);
-        setVerificationProgress(50);
+        setVerificationProgress(60);
 
         // Retrieve a custom dynamic anime profile picture from multiple APIs
         let randomAnimeAvatar = "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=150&q=80";
@@ -408,13 +408,9 @@ export default function App() {
         };
 
         await saveProfile(prof);
-        setVerificationProgress(85);
-        
-        // Final polish wait
-        await new Promise(r => setTimeout(r, 600));
         setVerificationProgress(100);
-
-        await new Promise(r => setTimeout(r, 300));
+        
+        // Instant transition
         setCurrUser(prof);
         setStepAuth("loggedIn");
         setShowTutorial(false);
