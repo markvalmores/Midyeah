@@ -277,6 +277,19 @@ export default function App() {
         }).catch(err => {
           console.warn("Could not instantly pre-load active offline session:", err);
         });
+      } else {
+        // Automatically set up a default guest profile if logged in but no session
+        const defaultGuest: UserProfile = {
+            username: "Guest",
+            email: "guest@midyeah.com",
+            channelName: "GUEST STATIONS",
+            channelUrl: "guest_ch",
+            bio: "Welcome to Midyeah!",
+            avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+            coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+            subscribersCount: 0
+        };
+        setCurrUser(defaultGuest);
       }
     });
   }, []);
@@ -364,20 +377,60 @@ export default function App() {
   };
 
   // 7-digit confirmation workflow simulation
-  const handleRequestAuthCode = (e: React.FormEvent) => {
+  const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput.trim() || !passInput.trim()) return;
+    if (!emailInput.trim()) return;
 
-    if (passInput.trim().length < 6) {
-      alert("Password must be at least 6 characters in length.");
-      return;
+    try {
+      // Check if user exists, if not, generate default
+      let profile = await getProfile(emailInput);
+      if (!profile) {
+        profile = {
+          username: emailInput.split("@")[0],
+          email: emailInput,
+          channelName: emailInput.split("@")[0].toUpperCase() + " STATIONS",
+          channelUrl: emailInput.split("@")[0] + "_ch",
+          bio: "Welcome to Midyeah!",
+          avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+          coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+          subscribersCount: 0
+        };
+        await saveProfile(profile);
+      }
+      
+      localStorage.setItem("midyeah_active_session_email", emailInput);
+      setCurrUser(profile);
+      setStepAuth("loggedIn");
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      alert(`Login Error: ${err.message || err}`);
     }
+  };
 
-    // generate a cool, copyable 7-digit verification tag
-    const code = Math.floor(1000000 + Math.random() * 9000000).toString();
-    setAuthCodeSent(code);
-    alert(`🔐 Midyeah Server Dispatch: 7-digit authorization code sent to ${emailInput}! Code: ${code} (Input below immediately)`);
-    setStepAuth("inputCode");
+  const handleGuestLogin = async () => {
+    const guestEmail = "guest@midyeah.com";
+    try {
+      let profile = await getProfile(guestEmail);
+      if (!profile) {
+        profile = {
+          username: "Guest",
+          email: guestEmail,
+          channelName: "GUEST STATIONS",
+          channelUrl: "guest_ch",
+          bio: "Welcome to Midyeah!",
+          avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+          coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+          subscribersCount: 0
+        };
+        await saveProfile(profile);
+      }
+      localStorage.setItem("midyeah_active_session_email", guestEmail);
+      setCurrUser(profile);
+      setStepAuth("loggedIn");
+    } catch (err: any) {
+      console.error("Guest login failed:", err);
+      alert("Failed to sign in as guest.");
+    }
   };
 
   const verifyRegisteredCode = async (e: React.FormEvent) => {
@@ -752,8 +805,8 @@ export default function App() {
             </div>
           ) : (
             <button
-              onClick={() => {}}
-              className="bg-purple-600 text-white font-bold text-xs p-1 px-3 rounded-xl flex items-center gap-1 pointer-events-none"
+              onClick={handleGuestLogin}
+              className="bg-purple-600 text-white font-bold text-xs p-1 px-3 rounded-xl flex items-center gap-1 cursor-pointer hover:bg-purple-500 transition"
               id="header-sign-in-btn"
             >
               <LogIn className="w-4 h-4" /> Guest Access
@@ -764,9 +817,18 @@ export default function App() {
       </header>
 
       {/* 2. BODY CONTENT ROUTER SWITCHBOARD */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 z-10 relative">
+      <motion.main
+        className="flex-1 max-w-7xl w-full mx-auto p-4 z-10 relative overflow-hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+        whileHover={{ scale: 1.005 }}
+        whileTap={{ scale: 0.98 }}
+        style={{
+          touchAction: "pan-y pinch-zoom",
+        }}
+      >
         <AnimatePresence mode="wait">
-          
           {/* START SCREEN */}
           {stepAuth === "startScreen" && (
             <motion.div
@@ -825,7 +887,7 @@ export default function App() {
                 <p className="text-[10px] text-purple-400 uppercase tracking-widest font-semibold mt-0.5">Please register your account safely</p>
               </div>
 
-              <form onSubmit={handleRequestAuthCode} className="space-y-4 text-xs mt-6">
+              <form onSubmit={handleDirectLogin} className="space-y-4 text-xs mt-6">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 uppercase text-[10px]">Your Email Address</label>
                   <input
@@ -839,44 +901,13 @@ export default function App() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-purple-400 font-semibold mb-1 uppercase text-[10px]">Secure Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={passInput}
-                    onChange={(e) => setPassInput(e.target.value)}
-                    className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition"
-                    id="auth-password-input"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-extrabold p-3 rounded-xl cursor-pointer shadow transition"
-                    id="auth-request-code-btn"
-                  >
-                    Send 7-Digit Registration Code 📬
-                  </button>
-                  <button
-                    type="button"
-                    title="Request temporary password"
-                    className="p-3 ml-2 bg-[#1C1C1F] border border-white/10 rounded-xl hover:bg-rose-950 transition"
-                    onClick={() => {
-                        const code = prompt("Enter secret code:");
-                        if (code === "ILOVEGOD") {
-                            alert("Request sent to mdv4244@gmail.com. Please wait for temporary password.");
-                        } else {
-                            alert("Invalid code.");
-                        }
-                    }}
-                    id="temp-pass-request-btn"
-                  >
-                    🔑
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-extrabold p-3 rounded-xl cursor-pointer shadow transition"
+                  id="auth-login-btn"
+                >
+                  Enter Dashboard ☕
+                </button>
               </form>
 
               <div className="mt-4 text-center border-t border-purple-950 pt-3">
@@ -1636,7 +1667,7 @@ export default function App() {
           )}
 
         </AnimatePresence>
-      </main>
+      </motion.main>
 
       {/* 3. HARDWARE CONSOLE HANDHELD CONTROLLER STYLE SHEETS */}
       {stepAuth === "loggedIn" && (

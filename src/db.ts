@@ -76,6 +76,10 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  if (error instanceof Error && error.message.includes("resource-exhausted")) {
+    hasFirestoreQuota = false;
+    console.warn("Firestore quota exhausted, disabling remote sync for the rest of session.");
+  }
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -196,6 +200,10 @@ export function base64ToBlob(base64Data: string, contentType: string = "video/mp
 }
 
 async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p: number) => void): Promise<void> {
+  if (!hasFirestoreQuota) {
+    console.log("Firestore quota exhausted, skipping chunk sync");
+    return;
+  }
   try {
     const RAW_CHUNK_SIZE = 500 * 1024; // 500KB raw binary size - highly resilient to network flutters & timeouts
     const numChunks = Math.ceil(blob.size / RAW_CHUNK_SIZE);
@@ -220,7 +228,10 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
         onProgress(Math.min(progress, 100));
       }
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (err.message && err.message.includes("resource-exhausted")) {
+        hasFirestoreQuota = false;
+    }
     console.warn("Incremental global video sync paused or deferred:", err);
   }
 }
@@ -341,6 +352,12 @@ export async function deleteProfileFromDb(email: string): Promise<void> {
   }
 }
 
+// Global Firestore sync state
+let hasFirestoreQuota = true;
+
+// Add a simple in-memory cache to skip Firestore writes if the profile hasn't changed.
+let lastSavedProfile = new Map<string, string>(); // email -> JSON.stringify(profile)
+
 // Profile Sync functions
 export async function saveProfile(profile: UserProfile): Promise<void> {
   // Save locally
@@ -348,11 +365,27 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   const tx = localDb.transaction("profiles", "readwrite");
   tx.objectStore("profiles").put(profile);
 
+  // Check if we already synced this profile state
+  const profileJson = JSON.stringify(profile);
+  if (lastSavedProfile.get(profile.email) === profileJson) {
+      console.log("Profile unchanged, skipping Firestore sync");
+      return; 
+  }
+
+  if (!hasFirestoreQuota) {
+      console.log("Firestore quota exhausted, skipping sync for saveProfile");
+      return;
+  }
+
   // Save globally in Firestore profiles collection
   try {
     const docRef = doc(db, "profiles", profile.email);
     await setDoc(docRef, { ...profile });
-  } catch (err) {
+    lastSavedProfile.set(profile.email, profileJson);
+  } catch (err: any) {
+    if (err.message && err.message.includes("resource-exhausted")) {
+      hasFirestoreQuota = false;
+    }
     console.warn("Firestore profile synchronization postponed, but details are safely saved inside client IndexedDB:", err);
   }
 }
@@ -429,18 +462,23 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
     hasVideoData: !!videoBlob || !!video.blob
   };
 
-  try {
-    const docRef = doc(db, "global_videos", video.id);
-    await setDoc(docRef, videoToSave);
-    
-    // Delegate the heavy chunk transmission and AWAIT it to ensure it completes successfully
-    const blobToUpload = videoBlob || video.blob;
-    if (blobToUpload) {
-      await uploadVideoInChunks(video.id, blobToUpload, onProgress);
+  if (hasFirestoreQuota) {
+    try {
+      const docRef = doc(db, "global_videos", video.id);
+      await setDoc(docRef, videoToSave);
+      
+      // Delegate the heavy chunk transmission and AWAIT it to ensure it completes successfully
+      const blobToUpload = videoBlob || video.blob;
+      if (blobToUpload) {
+        await uploadVideoInChunks(video.id, blobToUpload, onProgress);
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes("resource-exhausted")) {
+        hasFirestoreQuota = false;
+      }
+      console.warn("Firestore video synchronization failed:", err);
+      throw err; // Ensure the caller knows it failed
     }
-  } catch (err) {
-    console.warn("Firestore video synchronization failed:", err);
-    throw err; // Ensure the caller knows it failed
   }
 }
 
@@ -584,11 +622,16 @@ export async function saveComment(comment: Comment): Promise<void> {
   tx.objectStore("comments").put(comment);
 
   // Global write
-  try {
-    const docRef = doc(db, "global_videos", comment.videoId, "comments", comment.id);
-    await setDoc(docRef, cleanedComment);
-  } catch (err) {
-    console.warn("Firestore comment synchronization postponed, active on local browser:", err);
+  if (hasFirestoreQuota) {
+    try {
+      const docRef = doc(db, "global_videos", comment.videoId, "comments", comment.id);
+      await setDoc(docRef, cleanedComment);
+    } catch (err: any) {
+      if (err.message && err.message.includes("resource-exhausted")) {
+        hasFirestoreQuota = false;
+      }
+      console.warn("Firestore comment synchronization postponed, active on local browser:", err);
+    }
   }
 }
 
@@ -648,11 +691,16 @@ export async function saveDiscordMessage(msg: DiscordMessage): Promise<void> {
   tx.objectStore("messages").put(msg);
 
   // Global write
-  try {
-    const docRef = doc(db, "discord_messages", msg.id);
-    await setDoc(docRef, cleanMsg);
-  } catch (err) {
-    console.warn("Firestore Discord message synchronization postponed, available offline:", err);
+  if (hasFirestoreQuota) {
+    try {
+      const docRef = doc(db, "discord_messages", msg.id);
+      await setDoc(docRef, cleanMsg);
+    } catch (err: any) {
+      if (err.message && err.message.includes("resource-exhausted")) {
+        hasFirestoreQuota = false;
+      }
+      console.warn("Firestore Discord message synchronization postponed, available offline:", err);
+    }
   }
 }
 
@@ -738,11 +786,16 @@ export async function createPlaylist(name: string, ownerEmail: string): Promise<
   tx.objectStore("playlists").put(newPlaylist);
 
   // Global write
-  try {
-    const docRef = doc(db, "playlists", newPlaylist.id);
-    await setDoc(docRef, newPlaylist);
-  } catch (err) {
-    console.warn("Firestore playlist creation postoned, saved locally:", err);
+  if (hasFirestoreQuota) {
+    try {
+      const docRef = doc(db, "playlists", newPlaylist.id);
+      await setDoc(docRef, newPlaylist);
+    } catch (err: any) {
+      if (err.message && err.message.includes("resource-exhausted")) {
+        hasFirestoreQuota = false;
+      }
+      console.warn("Firestore playlist creation postoned, saved locally:", err);
+    }
   }
 
   return newPlaylist;
@@ -794,11 +847,16 @@ export async function updatePlaylist(playlist: Playlist): Promise<void> {
   tx.objectStore("playlists").put(playlist);
 
   // Global write
-  try {
-    const docRef = doc(db, "playlists", playlist.id);
-    await setDoc(docRef, playlist);
-  } catch (err) {
-    console.warn("Firestore playlist update postponed, saved locally:", err);
+  if (hasFirestoreQuota) {
+    try {
+      const docRef = doc(db, "playlists", playlist.id);
+      await setDoc(docRef, playlist);
+    } catch (err: any) {
+      if (err.message && err.message.includes("resource-exhausted")) {
+        hasFirestoreQuota = false;
+      }
+      console.warn("Firestore playlist update postponed, saved locally:", err);
+    }
   }
 }
 
@@ -877,11 +935,16 @@ export async function createDonationRecord(
   tx.objectStore("donations").put(newDonation);
 
   // Global write
-  try {
-    const docRef = doc(db, "donations", newDonation.id);
-    await setDoc(docRef, newDonation);
-  } catch (err) {
-    console.warn("Firestore donation record synchronization postponed, saved locally:", err);
+  if (hasFirestoreQuota) {
+    try {
+      const docRef = doc(db, "donations", newDonation.id);
+      await setDoc(docRef, newDonation);
+    } catch (err: any) {
+      if (err.message && err.message.includes("resource-exhausted")) {
+        hasFirestoreQuota = false;
+      }
+      console.warn("Firestore donation record synchronization postponed, saved locally:", err);
+    }
   }
 
   return newDonation;
