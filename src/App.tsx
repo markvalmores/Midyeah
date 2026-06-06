@@ -30,6 +30,7 @@ import DiscordChat from "./components/DiscordChat";
 import PlaylistsTab from "./components/PlaylistsTab";
 import SupportTab from "./components/SupportTab";
 import SearchTab from "./components/SearchTab";
+import VideoPage from "./components/VideoPage";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search">("home");
@@ -570,19 +571,14 @@ export default function App() {
       setUploadProgress(70);
       setUploadStage("Syncing to cloud...");
 
-      // Instantly inject the new video so user doesn't need to refresh - BOOM ITS IN MIDYEAH ASAP
-      const localUrl = URL.createObjectURL(uploadFile);
-      const newVideoWithUrl = { ...newVideo, videoUrl: localUrl };
-      setVideosList(prev => [newVideoWithUrl, ...prev]);
-      
-      // Run saveVideo in the background - do NOT await it so the user isn't blocked
-      saveVideo(newVideo, uploadFile, (p) => {
+      // Run saveVideo and await completion
+      await saveVideo(newVideo, uploadFile, (p) => {
         setUploadProgress(p);
         setUploadStage(`Syncing... ${p}%`);
-      }).catch(err => {
-          console.error("Background sync failed:", err);
-          // Optionally show a non-intrusive UI notification that sync failed
       });
+      
+      // Update the videos list only AFTER successful save
+      setVideosList(prev => [newVideo, ...prev]);
       
       setUploadProgress(100);
       setUploadStage("Completed!");
@@ -1280,11 +1276,16 @@ export default function App() {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                           {/* Rich Player node */}
                           <div className="lg:col-span-2 space-y-4">
-                            <VideoPlayer
+                            <VideoPage
                               video={currentVideo}
                               onDownload={handleDownloadVideo}
                               onSaveToLibrary={handleSaveToMidyeahLibrary}
                               isDownloaded={downloadedIds.includes(currentVideo.id)}
+                              comments={comments}
+                              onAddComment={handleAddComment}
+                              setCommentInput={setCommentInput}
+                              commentInput={commentInput}
+                              currUser={currUser}
                             />
 
                             {/* PUBLIC COMMENTS SECTION - YouTube styled */}
