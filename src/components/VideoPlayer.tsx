@@ -811,6 +811,22 @@ export default function VideoPlayer({ video, onDownload, onSaveToLibrary, isDown
 
           <div className="flex items-center gap-2">
             <button
+              onClick={async () => {
+                try {
+                  const newCount = (video.creator.subscribersCount || 0) + 1;
+                  const updatedVideo = {
+                    ...video,
+                    creator: {
+                      ...video.creator,
+                      subscribersCount: newCount
+                    }
+                  };
+                  await saveVideo(updatedVideo);
+                  alert(`Subscribed! ${video.creator.channelName} now has ${newCount} subscribers.`);
+                } catch(e) {
+                  console.error(e);
+                }
+              }}
               className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-full shadow cursor-pointer transition"
               id="subscribe-channel-btn"
             >

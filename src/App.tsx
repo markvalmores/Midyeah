@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 import { Video, UserProfile, Comment, Playlist } from "./types";
 import { 
-  getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
+  subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
   getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist
 } from "./db";
@@ -268,8 +268,14 @@ export default function App() {
 
   // Hydrate initial database connection and load videos
   useEffect(() => {
+    let unsubscribeVideos = () => {};
     openDB().then(() => {
-      reloadVideos();
+      // Setup Realtime multiplayer video feed
+      unsubscribeVideos = subscribeAllVideos((items) => {
+         setVideosList(items || []);
+         const savedOfflines = items.filter(v => v.isOffline).map(v => v.id);
+         setDownloadedIds(savedOfflines);
+      });
 
       // Instant local-first session restoration on initial boot
       const savedEmail = localStorage.getItem("midyeah_active_session_email");
@@ -298,6 +304,10 @@ export default function App() {
         setCurrUser(defaultGuest);
       }
     });
+
+    return () => {
+      unsubscribeVideos();
+    };
   }, []);
 
   const reloadPlaylists = async (email: string) => {
@@ -335,7 +345,7 @@ export default function App() {
                 bio: "Thank you for watching on Midyeah, God bless everyone!",
                 avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
                 coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-                subscribersCount: 775
+                subscribersCount: 0
               };
               localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
               setCurrUser(prof);
@@ -469,7 +479,7 @@ export default function App() {
           bio: "Thank you for watching on Midyeah, God bless everyone!",
           avatarUrl: randomAnimeAvatar,
           coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-          subscribersCount: 775 // starting statistics close to criteria triggers
+          subscribersCount: 0
         };
 
         await saveProfile(prof);

@@ -10,7 +10,7 @@ import {
 } from "firebase/auth";
 import { 
   getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
-  query, orderBy, getDocFromServer, collectionGroup
+  query, orderBy, getDocFromServer, collectionGroup, onSnapshot
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { Video, UserProfile, Comment, DiscordMessage, Playlist, DonationRecord, DonationStats } from "./types";
@@ -362,29 +362,20 @@ let lastSavedProfile = new Map<string, string>(); // email -> JSON.stringify(pro
 export async function saveProfile(profile: UserProfile): Promise<void> {
   // Save locally
   const localDb = await openDB();
-  const tx = localDb.transaction("profiles", "readwrite");
-  tx.objectStore("profiles").put(profile);
-
-  // Check if we already synced this profile state
-  const profileJson = JSON.stringify(profile);
-  if (lastSavedProfile.get(profile.email) === profileJson) {
-      console.log("Profile unchanged, skipping Firestore sync");
-      return; 
-  }
-
-  if (!hasFirestoreQuota) {
-      console.log("Firestore quota exhausted, skipping sync for saveProfile");
-      return;
-  }
+  await new Promise<void>((resolve, reject) => {
+    const tx = localDb.transaction("profiles", "readwrite");
+    tx.objectStore("profiles").put(profile);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 
   // Save globally in Firestore profiles collection
   try {
     const docRef = doc(db, "profiles", profile.email);
     await setDoc(docRef, { ...profile });
-    lastSavedProfile.set(profile.email, profileJson);
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
-      hasFirestoreQuota = false;
+      console.warn("Firestore quota used, synced locally.", err);
     }
     console.warn("Firestore profile synchronization postponed, but details are safely saved inside client IndexedDB:", err);
   }
@@ -467,10 +458,10 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
       const docRef = doc(db, "global_videos", video.id);
       await setDoc(docRef, videoToSave);
       
-      // Delegate the heavy chunk transmission and AWAIT it to ensure it completes successfully
+      // Delegate the heavy chunk transmission without awaiting, to keep UI hyper-responsive
       const blobToUpload = videoBlob || video.blob;
       if (blobToUpload) {
-        await uploadVideoInChunks(video.id, blobToUpload, onProgress);
+        uploadVideoInChunks(video.id, blobToUpload, onProgress).catch(e => console.warn("Background chunk upload issue:", e));
       }
     } catch (err: any) {
       if (err.message && err.message.includes("resource-exhausted")) {
@@ -480,6 +471,91 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
       throw err; // Ensure the caller knows it failed
     }
   }
+}
+
+export function subscribeAllVideos(callback: (videos: Video[]) => void): () => void {
+  const collRef = collection(db, "global_videos");
+  return onSnapshot(collRef, async (snap) => {
+    const remoteVideos: Video[] = [];
+    snap.forEach(docSnap => {
+      const dv = docSnap.data();
+      remoteVideos.push({
+        id: dv.id,
+        title: dv.title,
+        description: dv.description,
+        videoUrl: dv.videoUrl || "",
+        category: dv.category || "normal",
+        rentalPrice: dv.rentalPrice,
+        rentalPeriod: dv.rentalPeriod,
+        is360: dv.is360,
+        uploadDate: dv.uploadDate,
+        creator: dv.creator,
+        views: dv.views || 0,
+        likes: dv.likes || 0,
+        dislikes: dv.dislikes || 0,
+        reactions: dv.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
+        duration: dv.duration || 120,
+        thumbnailUrl: dv.thumbnailUrl || "",
+        country: dv.country || "philippines"
+      });
+    });
+
+    try {
+      const localDb = await openDB();
+      const cachedDbVideos: Video[] = await new Promise((resolve, reject) => {
+        const tx = localDb.transaction("videos", "readonly");
+        const req = tx.objectStore("videos").getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+
+      const cachedMap = new Map<string, Video>();
+      cachedDbVideos.forEach(v => {
+        if (v.blob) {
+          const existingUrl = objectUrlCache.get(v.id);
+          if (existingUrl) {
+            v.videoUrl = existingUrl;
+          } else {
+            const url = URL.createObjectURL(v.blob);
+            objectUrlCache.set(v.id, url);
+            v.videoUrl = url;
+          }
+          v.isOffline = true;
+        }
+        cachedMap.set(v.id, v);
+      });
+
+      const mergedVideosMap = new Map<string, Video>();
+      
+      remoteVideos.forEach(v => {
+        const local = cachedMap.get(v.id);
+        if (local) {
+          v.isOffline = true;
+          v.videoUrl = local.videoUrl;
+          v.blob = local.blob;
+        }
+        mergedVideosMap.set(v.id, v);
+      });
+
+      cachedDbVideos.forEach(v => {
+        if (!mergedVideosMap.has(v.id)) {
+          mergedVideosMap.set(v.id, v);
+        }
+      });
+
+      // Sort with newest uploads first
+      const items = Array.from(mergedVideosMap.values());
+      items.sort((a, b) => b.id.localeCompare(a.id));
+      
+      callback(items);
+    } catch (err) {
+      console.warn("Merge local with remote failed in subscription:", err);
+      remoteVideos.sort((a, b) => b.id.localeCompare(a.id));
+      callback(remoteVideos);
+    }
+  }, (err) => {
+    console.warn("Realtime videos subscription issue:", err);
+  });
 }
 
 export async function getAllVideos(): Promise<Video[]> {
