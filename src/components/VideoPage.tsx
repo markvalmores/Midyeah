@@ -1,4 +1,5 @@
 import React from "react";
+import { ArrowLeft } from "lucide-react";
 import { Video, Comment } from "../types";
 import VideoPlayer from "./VideoPlayer";
 
@@ -12,20 +13,26 @@ interface VideoPageProps {
   setCommentInput: (val: string) => void;
   commentInput: string;
   currUser: any;
+  onClose: () => void;
 }
 
 export default function VideoPage({ 
-  video, onDownload, onSaveToLibrary, isDownloaded, comments, onAddComment, setCommentInput, commentInput, currUser 
+  video, onDownload, onSaveToLibrary, isDownloaded, comments, onAddComment, setCommentInput, commentInput, currUser, onClose
 }: VideoPageProps) {
   const bgColor = video.category === 'movie' ? 'bg-red-950' : video.category === 'rental' ? 'bg-purple-950' : 'bg-emerald-950';
   const label = video.category === 'movie' ? 'MOVIE' : video.category === 'rental' ? 'RENTAL' : 'STANDARD';
 
   return (
-    <div className={`${bgColor} min-h-screen p-8 text-white transition-colors duration-500`}>
+    <div className={`${bgColor} rounded-3xl p-6 lg:p-8 text-white transition-colors duration-500 border border-white/10 shadow-2xl overflow-hidden`}>
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">{video.title}</h1>
-            <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-widest bg-black/30 border border-white/20`}>{label}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <button onClick={onClose} className="p-2 bg-black/20 hover:bg-black/40 rounded-full transition border border-white/10" aria-label="Go back">
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+              <h1 className="text-3xl font-bold">{video.title}</h1>
+            </div>
+            <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-widest bg-black/30 border border-white/20 whitespace-nowrap self-start sm:self-auto`}>{label}</span>
         </div>
         
         <VideoPlayer

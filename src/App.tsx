@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
@@ -54,6 +54,12 @@ export default function App() {
 
   // Tutorial overlay
   const [showTutorial, setShowTutorial] = useState(false);
+
+  // Keep track of current user to prevent overwrites
+  const currUserRef = useRef(currUser);
+  useEffect(() => {
+    currUserRef.current = currUser;
+  }, [currUser]);
 
   // Video datasets
   const [videosList, setVideosList] = useState<Video[]>([]);
@@ -307,6 +313,9 @@ export default function App() {
   // Hydrate and synchronize active Firebase Auth sessions
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      // Prevent profile reset if we already have a user
+      if (currUserRef.current) return;
+
       if (firebaseUser?.email) {
         try {
           const profile = await getProfile(firebaseUser.email);
@@ -1273,98 +1282,18 @@ export default function App() {
                           </div>
                         </div>
                       ) : currentVideo ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                          {/* Rich Player node */}
-                          <div className="lg:col-span-2 space-y-4">
-                            <VideoPage
-                              video={currentVideo}
-                              onDownload={handleDownloadVideo}
-                              onSaveToLibrary={handleSaveToMidyeahLibrary}
-                              isDownloaded={downloadedIds.includes(currentVideo.id)}
-                              comments={comments}
-                              onAddComment={handleAddComment}
-                              setCommentInput={setCommentInput}
-                              commentInput={commentInput}
-                              currUser={currUser}
-                            />
-
-                            {/* PUBLIC COMMENTS SECTION - YouTube styled */}
-                            <div className="bg-[#121214] border border-white/10 p-5 rounded-3xl shadow-xl space-y-4">
-                              <h3 className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-white/5 pb-2">
-                                💬 Public Comments ({comments.length} Sync'd Worldwide)
-                              </h3>
-                              
-                              <form onSubmit={handleAddComment} className="flex gap-3 items-start mt-2">
-                                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-purple-500/30">
-                                  <img 
-                                    src={currUser?.avatarUrl} 
-                                    className="w-full h-full object-cover" 
-                                    onError={(e)=>(e.target as any).src="https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40"} 
-                                    referrerPolicy="no-referrer"
-                                  />
-                                </div>
-                                <div className="flex-1 space-y-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Add a public comment..."
-                                    value={commentInput}
-                                    onChange={(e) => setCommentInput(e.target.value)}
-                                    className="bg-[#1C1C1F] border border-white/10 rounded-xl p-2.5 px-3 text-xs text-white w-full outline-none focus:border-purple-500"
-                                    id="add-comment-input-grid"
-                                  />
-                                  <div className="flex justify-end pr-1">
-                                    <button
-                                      type="submit"
-                                      disabled={!commentInput.trim()}
-                                      className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold p-1.5 px-4 rounded-xl text-[10px] uppercase tracking-wide transition cursor-pointer"
-                                      id="add-comment-submit-btn"
-                                    >
-                                      Comment
-                                    </button>
-                                  </div>
-                                </div>
-                              </form>
-
-                              {/* Comments lists log */}
-                              <div className="space-y-3 mt-4 max-h-[250px] overflow-y-auto pr-1 select-none scrollbar-thin">
-                                {isLoadingComments ? (
-                                  <p className="text-[10px] text-zinc-500 text-center py-4">Streaming and verifying comments from global nodes...</p>
-                                ) : comments.length === 0 ? (
-                                  <p className="text-[10px] text-zinc-500 text-center py-4">No public comments yet on this video. Be the first to share your thoughts!</p>
-                                ) : (
-                                  comments.map((comment) => (
-                                    <div key={comment.id} className="flex gap-3 text-xs p-2.5 bg-[#1C1C1F]/40 hover:bg-[#1C1C1F]/60 border border-transparent hover:border-white/5 rounded-xl transition">
-                                      <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 border border-white/5">
-                                        <img src={comment.avatarUrl} className="w-full h-full object-cover" onError={(e)=>(e.target as any).src="https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40"} referrerPolicy="no-referrer" />
-                                      </div>
-                                      <div className="flex-1 space-y-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-purple-300">{comment.username}</span>
-                                          <span className="text-[9px] text-gray-500">{new Date(comment.timestamp).toLocaleDateString()}</span>
-                                        </div>
-                                        <p className="text-gray-300 leading-relaxed">{comment.text}</p>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Companion games launcher widget beside player */}
-                          <div className="space-y-4">
-                            <Games />
-                            
-                            <div className="bg-[#121214] border border-white/10 p-5 rounded-2xl shadow-xl text-xs select-none">
-                              <h3 className="font-bold text-white uppercase text-[10px] tracking-wide mb-1 flex items-center gap-1.5 text-purple-400">
-                                🛸 PICTURE IN PICTURE BROADCASTER
-                              </h3>
-                              <p className="text-slate-300 leading-relaxed">
-                                Feel free to scroll down to explore more movies or play casual retro games! The PiP overlay falling window keeps synchronizing background play smoothly.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                        <VideoPage
+                          video={currentVideo}
+                          onDownload={handleDownloadVideo}
+                          onSaveToLibrary={handleSaveToMidyeahLibrary}
+                          isDownloaded={downloadedIds.includes(currentVideo.id)}
+                          comments={comments}
+                          onAddComment={handleAddComment}
+                          setCommentInput={setCommentInput}
+                          commentInput={commentInput}
+                          currUser={currUser}
+                          onClose={() => setCurrentVideo(null)}
+                        />
                       ) : (
                         /* Welcome Showcase Banner */
                         <div className="bg-gradient-to-br from-[#1C1C1F] via-[#121214] to-black border border-white/10 rounded-3xl p-6 relative overflow-hidden select-none">
