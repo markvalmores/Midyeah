@@ -513,6 +513,9 @@ export default function App() {
       setUploadStage("Upload completed! Movie successfully deployed.");
       await sleep(400);
 
+      // Instantly inject the new video so user doesn't need to refresh
+      setVideosList(prev => [newVideo, ...prev]);
+
       setUploadTitle("");
       setUploadDesc("");
       setUploadIs360(false);
@@ -525,7 +528,8 @@ export default function App() {
       setUploadProgress(null);
       setUploadStage("");
 
-      alert(`🎬 '${newVideo.title}' registered and saved persistently into Midyeah database! Try closing and reopen the tab; it will stay persistent!`);
+      alert(`🎬 '${newVideo.title}' registered and saved persistently into Midyeah database!`);
+      // Keeping reloadVideos() as a final sync just in case
       reloadVideos();
       setIsCreatorMode(false); // switch back to explore view
     } catch (err: any) {
