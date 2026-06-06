@@ -9,16 +9,17 @@ import {
   Trophy, CheckCircle, ExternalLink, Heart, Send
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { UserProfile } from "../types";
+import { UserProfile, Video } from "../types";
 
 interface ProfileProps {
   profile: UserProfile;
+  userVideos: Video[];
   onUpdate: (updated: UserProfile) => void;
   onLogOut?: () => void;
   onDeleteAccount?: () => void;
 }
 
-export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }: ProfileProps) {
+export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDeleteAccount }: ProfileProps) {
   const [username, setUsername] = useState(profile.username);
   const [channelName, setChannelName] = useState(profile.channelName);
   const [channelUrl, setChannelUrl] = useState(profile.channelUrl);
@@ -36,11 +37,6 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
 
   // Delete account double confirmation flow step state
   const [deletePromptStep, setDeletePromptStep] = useState<0 | 1 | 2>(0);
-
-  // Simulated metrics to trigger Partnership Modal!
-  const [subsCount, setSubsCount] = useState(720); // starts close to 777
-  const [watchHrs, setWatchHrs] = useState(320); // starts close to 340
-  const [totalLikes, setTotalLikes] = useState(3100); // starts close to 3400
 
   const [showPayoutSaved, setShowPayoutSaved] = useState(false);
   const [showPartnerEmail, setShowPartnerEmail] = useState(false);
@@ -66,8 +62,14 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
     profile.paypal
   ]);
 
+  // Real-time calculation from user profile and videos
+  const realSubsCount = profile.subscribersCount || 0;
+  const realTotalLikes = userVideos.reduce((acc, v) => acc + (v.likes || 0), 0);
+  const realWatchHrs = userVideos.reduce((acc, v) => acc + (((v.duration || 0) * (v.views || 0)) / 3600), 0);
+  const watchHrsDisp = Math.floor(realWatchHrs); 
+
   // Partnership validation checks
-  const isPartnerApproved = subsCount >= 777 && watchHrs >= 340 && totalLikes >= 3400;
+  const isPartnerApproved = realSubsCount >= 777 && watchHrsDisp >= 340 && realTotalLikes >= 3400;
 
   const handleAvatarFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -117,8 +119,8 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
     reader.readAsDataURL(file);
   };
 
-  const handleProfileSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleProfileSave = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     onUpdate({
       ...profile,
       username,
@@ -130,7 +132,11 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
       gcash,
       paypal
     });
-    alert("Cozy Profile Settings Saved Successfully! 🐰☕");
+    if (e) alert("Cozy Profile Settings Saved Successfully! 🐰☕");
+  };
+
+  const handleBlur = () => {
+    handleProfileSave();
   };
 
   const handleLinkPayout = (e: React.FormEvent) => {
@@ -342,6 +348,7 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
                   placeholder="Paste Image URL"
                   value={avatarUrl}
                   onChange={(e) => setAvatarUrl(e.target.value)}
+                  onBlur={handleBlur}
                   className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 font-mono transition"
                   id="profile-avatar-url-input"
                 />
@@ -354,6 +361,7 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
                   placeholder="midyeah_ch_handle"
                   value={channelUrl}
                   onChange={(e) => setChannelUrl(e.target.value)}
+                  onBlur={handleBlur}
                   className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-purple-400 font-mono font-bold outline-none focus:border-purple-500 transition"
                   id="profile-ch-handle-input"
                 />
@@ -369,6 +377,7 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
                   placeholder="Your Name"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  onBlur={handleBlur}
                   className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition"
                   id="profile-username-input"
                 />
@@ -382,6 +391,7 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
                   placeholder="Showcase channel"
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
+                  onBlur={handleBlur}
                   className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition"
                   id="profile-ch-name-input"
                 />
@@ -395,6 +405,7 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
                 placeholder="Be comfortable when you watch on Midyeah streaming, God bless everyone..."
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
+                onBlur={handleBlur}
                 className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition"
                 id="profile-bio-input"
               />
@@ -415,7 +426,7 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
         {/* Creator Partnership & Monetization track bar */}
         <div className="flex flex-col gap-4">
           
-          {/* Creator partner goals sliders tracker (let user simulate reaching goals!) */}
+          {/* Creator partner goals realtime tracker */}
           <div className="bg-[#1C1C1F] border border-white/10 rounded-2xl p-4 space-y-3.5">
             <div className="flex items-center gap-1.5 border-b border-white/5 pb-2 mb-1">
               <Award className="w-4 h-4 text-purple-400" />
@@ -423,58 +434,40 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
             </div>
 
             <p className="text-[10px] text-gray-400 leading-relaxed">
-              Reach requirements to unlock withdrawals! Use sliders to simulate organic subscriber and viewer growth.
+              Reach requirements to unlock withdrawals! Your stats are completely real and monitored in realtime.
             </p>
 
-            {/* Slider 1: Subscribers (Target 777) */}
+            {/* Stat 1: Subscribers (Target 777) */}
             <div>
               <div className="flex items-center justify-between text-[10px] text-gray-300 font-semibold mb-0.5">
-                <span>Subscribers (Target 777):</span>
-                <span className={subsCount >= 777 ? "text-emerald-400" : "text-purple-300"}>{subsCount} / 777</span>
+                <span>Real Subscribers (Target 777):</span>
+                <span className={realSubsCount >= 777 ? "text-emerald-400" : "text-purple-300"}>{realSubsCount} / 777</span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="1000"
-                value={subsCount}
-                onChange={(e) => setSubsCount(parseInt(e.target.value))}
-                className="w-full accent-purple-500 h-1 bg-gray-800 roundedcursor-pointer"
-                id="simulate-subs-slider"
-              />
+              <div className="w-full h-1 bg-gray-800 rounded">
+                <div className="h-full bg-purple-500 rounded" style={{ width: `${Math.min(100, (realSubsCount / 777) * 100)}%` }} />
+              </div>
             </div>
 
-            {/* Slider 2: Watch Hours (Target 340) */}
+            {/* Stat 2: Watch Hours (Target 340) */}
             <div>
               <div className="flex items-center justify-between text-[10px] text-gray-300 font-semibold mb-0.5">
-                <span>Watch Hours (Target 340):</span>
-                <span className={watchHrs >= 340 ? "text-emerald-400" : "text-purple-300"}>{watchHrs} / 340 hrs</span>
+                <span>Real Watch Hours (Target 340):</span>
+                <span className={watchHrsDisp >= 340 ? "text-emerald-400" : "text-purple-300"}>{watchHrsDisp} / 340 hrs</span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="500"
-                value={watchHrs}
-                onChange={(e) => setWatchHrs(parseInt(e.target.value))}
-                className="w-full accent-purple-500 h-1 bg-gray-800 roundedcursor-pointer"
-                id="simulate-hours-slider"
-              />
+              <div className="w-full h-1 bg-gray-800 rounded">
+                <div className="h-full bg-purple-500 rounded" style={{ width: `${Math.min(100, (watchHrsDisp / 340) * 100)}%` }} />
+              </div>
             </div>
 
-            {/* Slider 3: Total Likes (Target 3400) */}
+            {/* Stat 3: Total Likes (Target 3400) */}
             <div>
               <div className="flex items-center justify-between text-[10px] text-gray-300 font-semibold mb-0.5">
-                <span>Total Channel Likes (Target 3400):</span>
-                <span className={totalLikes >= 3400 ? "text-emerald-400" : "text-purple-300"}>{totalLikes} / 3400</span>
+                <span>Real Channel Likes (Target 3400):</span>
+                <span className={realTotalLikes >= 3400 ? "text-emerald-400" : "text-purple-300"}>{realTotalLikes} / 3400</span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="5000"
-                value={totalLikes}
-                onChange={(e) => setTotalLikes(parseInt(e.target.value))}
-                className="w-full accent-purple-500 h-1 bg-gray-800 roundedcursor-pointer"
-                id="simulate-likes-slider"
-              />
+              <div className="w-full h-1 bg-gray-800 rounded">
+                <div className="h-full bg-purple-500 rounded" style={{ width: `${Math.min(100, (realTotalLikes / 3400) * 100)}%` }} />
+              </div>
             </div>
 
             {/* Partnership Met Status Gauge */}
@@ -486,7 +479,7 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
                 </div>
               ) : (
                 <div className="bg-[#0A0A0B] border border-white/10 p-2.5 rounded-xl text-center text-[10px] text-gray-400">
-                  ⚠️ Complete metrics above to trigger Partner congrats dashboard
+                  ⚠️ Complete real metrics above to trigger Partner congrats dashboard
                 </div>
               )}
             </div>
@@ -571,15 +564,15 @@ export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }
                 <div className="grid grid-cols-3 gap-2.5 text-center mt-2 text-white">
                   <div className="bg-[#0c0a0f] p-2 rounded-lg border border-purple-900/50">
                     <span className="text-purple-300 text-[9px] block uppercase font-mono">Members</span>
-                    <span className="font-mono text-sm font-bold block">{subsCount}</span>
+                    <span className="font-mono text-sm font-bold block">{realSubsCount}</span>
                   </div>
                   <div className="bg-[#0c0a0f] p-2 rounded-lg border border-purple-900/50">
                     <span className="text-purple-300 text-[9px] block uppercase font-mono">Stream Hours</span>
-                    <span className="font-mono text-sm font-bold block">{watchHrs} hrs</span>
+                    <span className="font-mono text-sm font-bold block">{watchHrsDisp} hrs</span>
                   </div>
                   <div className="bg-[#0c0a0f] p-2 rounded-lg border border-purple-900/50">
                     <span className="text-purple-300 text-[9px] block uppercase font-mono">Favorites</span>
-                    <span className="font-mono text-sm font-bold block">{totalLikes}</span>
+                    <span className="font-mono text-sm font-bold block">{realTotalLikes}</span>
                   </div>
                 </div>
 

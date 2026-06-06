@@ -373,6 +373,26 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   try {
     const docRef = doc(db, "profiles", profile.email);
     await setDoc(docRef, { ...profile });
+
+    // Cascade profile changes to all globally published videos in realtime
+    try {
+      const collRef = collection(db, "global_videos");
+      const snap = await getDocs(collRef);
+      const updates: Promise<void>[] = [];
+      snap.forEach(docSnap => {
+        const dv = docSnap.data();
+        if (dv.creator && dv.creator.email === profile.email) {
+          updates.push(setDoc(doc(db, "global_videos", dv.id), {
+            ...dv,
+            creator: profile
+          }));
+        }
+      });
+      await Promise.all(updates);
+    } catch (ve) {
+      console.warn("Could not cascade profile update to videos:", ve);
+    }
+
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
       console.warn("Firestore quota used, synced locally.", err);

@@ -813,18 +813,31 @@ export default function VideoPlayer({ video, onDownload, onSaveToLibrary, isDown
             <button
               onClick={async () => {
                 try {
-                  const newCount = (video.creator.subscribersCount || 0) + 1;
-                  const updatedVideo = {
-                    ...video,
-                    creator: {
-                      ...video.creator,
+                  const { getProfile, saveProfile } = await import("../db");
+                  const currentCreatorProfile = await getProfile(video.creator.email);
+                  if (currentCreatorProfile) {
+                    const newCount = (currentCreatorProfile.subscribersCount || 0) + 1;
+                    const updatedProfile = {
+                      ...currentCreatorProfile,
                       subscribersCount: newCount
-                    }
-                  };
-                  await saveVideo(updatedVideo);
-                  alert(`Subscribed! ${video.creator.channelName} now has ${newCount} subscribers.`);
+                    };
+                    await saveProfile(updatedProfile);
+                    alert(`Subscribed! ${updatedProfile.channelName} now has ${newCount} members.`);
+                  } else {
+                    const newCount = (video.creator.subscribersCount || 0) + 1;
+                    const updatedVideo = {
+                      ...video,
+                      creator: {
+                        ...video.creator,
+                        subscribersCount: newCount
+                      }
+                    };
+                    await saveVideo(updatedVideo);
+                    alert(`Subscribed! ${video.creator.channelName} now has ${newCount} subscribers.`);
+                  }
                 } catch(e) {
                   console.error(e);
+                  alert("Failed to subscribe.");
                 }
               }}
               className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-full shadow cursor-pointer transition"

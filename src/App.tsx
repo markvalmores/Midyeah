@@ -718,6 +718,11 @@ export default function App() {
         MIDYEAH
       </div>
 
+      {/* GOD/CHRISTIAN THEMED DEDICATION BANNER */}
+      <div className="bg-gradient-to-r from-amber-600/20 via-yellow-500/30 to-amber-600/20 text-yellow-200/90 text-[10px] sm:text-xs font-semibold py-1.5 px-4 text-center border-b border-yellow-500/20 tracking-wider shadow-[0_0_15px_rgba(234,179,8,0.1)] flex items-center justify-center gap-2">
+        <span className="animate-pulse">🕊️</span> Dedicated for the Lord Jesus Christ — All Creations Will Know and Use This Forever More. Amen. <span className="animate-pulse">🕊️</span>
+      </div>
+
       {/* 1. TOP HEADER BANNER BAR */}
       <header className="sticky top-0 z-40 bg-[#121214]/90 border-b border-white/10 backdrop-blur-md px-6 py-4 flex items-center justify-between gap-4">
         
@@ -1690,9 +1695,15 @@ export default function App() {
 
                   {activeTab === "community" && <DiscordChat />}
 
-                  {activeTab === "profile" && currUser && (
-                    <Profile profile={currUser} onUpdate={handleProfileUpdate} onLogOut={handleLogOut} onDeleteAccount={handleDeleteAccount} />
-                  )}
+                {activeTab === "profile" && currUser && (
+                  <Profile 
+                    profile={currUser} 
+                    userVideos={videosList.filter(v => v.creator.email === currUser.email)}
+                    onUpdate={handleProfileUpdate} 
+                    onLogOut={handleLogOut} 
+                    onDeleteAccount={handleDeleteAccount} 
+                  />
+                )}
 
                 </div>
               )}
