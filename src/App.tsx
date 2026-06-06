@@ -466,20 +466,16 @@ export default function App() {
 
     // Initialize progress indicators
     setUploadProgress(0);
-    setUploadStage("Opening database pipeline...");
-
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    setUploadStage("Fast-tracking upload...");
 
     try {
       // Stage 1: File pre-parsing
-      await sleep(350);
-      setUploadProgress(15);
-      setUploadStage(`Reading film packet references (${(uploadFile.size / (1024 * 1024)).toFixed(2)} MB)...`);
+      setUploadProgress(20);
+      setUploadStage(`Reading film...`);
 
       // Stage 2: Content signature mapping
-      await sleep(350);
-      setUploadProgress(30);
-      setUploadStage("Processing creative codec frames...");
+      setUploadProgress(40);
+      setUploadStage("Processing...");
 
       // Prepare movie credentials
       const videoUrl = URL.createObjectURL(uploadFile);
@@ -507,24 +503,16 @@ export default function App() {
       };
 
       // Stage 3: Dynamic byte-stream compilation
-      for (let p = 45; p <= 85; p += 10) {
-        await sleep(300);
-        setUploadProgress(p);
-        setUploadStage(`Streaming database blob files to storage... ${p}%`);
-      }
-
-      await sleep(200);
-      setUploadStage("Uploading...");
+      setUploadProgress(70);
+      setUploadStage("Syncing to cloud...");
 
       await saveVideo(newVideo, uploadFile, (p) => {
         setUploadProgress(p);
-        setUploadStage(`Uploading... ${p}%`);
+        setUploadStage(`Syncing... ${p}%`);
       });
       
-      await sleep(300);
       setUploadProgress(100);
-      setUploadStage("Upload completed! Movie successfully deployed.");
-      await sleep(400);
+      setUploadStage("Completed!");
 
       // Instantly inject the new video so user doesn't need to refresh
       setVideosList(prev => [newVideo, ...prev]);
