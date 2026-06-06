@@ -100,6 +100,7 @@ export interface RadioStation {
   fallbackUrl?: string;
   logo: string;
   country: string; // Country filter tag, e.g. "philippines", "japan", "usa", "uk", "france", "germany", "australia"
+  youtubeChannelId?: string; // Optional YouTube channel ID or Live stream URL/embed tag
 }
 
 export interface Playlist {

@@ -45,7 +45,7 @@ export default function App() {
   const [currUser, setCurrUser] = useState<UserProfile | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [passInput, setPassInput] = useState("");
-  const [stepAuth, setStepAuth] = useState<"loggedOut" | "inputCode" | "onboard" | "loggedIn">("loggedOut");
+  const [stepAuth, setStepAuth] = useState<"startScreen" | "loggedOut" | "inputCode" | "onboard" | "loggedIn">("startScreen");
   const [verificationCode, setVerificationCode] = useState("");
   const [authCodeSent, setAuthCodeSent] = useState("");
 
@@ -269,7 +269,7 @@ export default function App() {
         getProfile(savedEmail).then((profile) => {
           if (profile) {
             setCurrUser(profile);
-            setStepAuth("loggedIn");
+            // Do not automatically set stepAuth here
             reloadPlaylists(profile.email);
           }
         }).catch(err => {
@@ -297,7 +297,7 @@ export default function App() {
           if (profile) {
             localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
             setCurrUser(profile);
-            setStepAuth("loggedIn");
+            // Do not automatically set stepAuth here
             reloadPlaylists(profile.email);
           } else {
             // Fallback: Generate dynamic user profile document if none exists in Firestore
@@ -313,7 +313,7 @@ export default function App() {
             };
             localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
             setCurrUser(prof);
-            setStepAuth("loggedIn");
+            // Do not automatically set stepAuth here
             reloadPlaylists(prof.email);
           }
         } catch (e) {
@@ -326,7 +326,7 @@ export default function App() {
           getProfile(savedEmail).then((profile) => {
             if (profile) {
               setCurrUser(profile);
-              setStepAuth("loggedIn");
+              // setStepAuth("loggedIn");
               reloadPlaylists(profile.email);
             }
           });
@@ -337,11 +337,11 @@ export default function App() {
         getProfile("guest@midyeah.com").then((profile) => {
           if (profile) {
             setCurrUser(profile);
-            setStepAuth("loggedIn");
+            // setStepAuth("loggedIn");
             reloadPlaylists(profile.email);
           } else {
             setCurrUser(null);
-            setStepAuth("loggedOut");
+            // setStepAuth("loggedOut");
             setUserPlaylists([]);
           }
         });
@@ -761,6 +761,46 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 z-10 relative">
         <AnimatePresence mode="wait">
           
+          {/* START SCREEN */}
+          {stepAuth === "startScreen" && (
+            <motion.div
+              key="start-screen"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="min-h-[80vh] flex flex-col items-center justify-center text-center p-8 bg-cover bg-center"
+              style={{ backgroundImage: "url('https://zachsthoughts.com/wp-content/uploads/2025/08/tadc_tent.jpg')" }}
+            >
+              <h1 
+                className="text-7xl font-black text-white mb-8 tracking-widest font-display"
+                style={{
+                  textShadow: `
+                    0 2px 0 #6b21a8, 
+                    0 4px 0 #581c87, 
+                    0 6px 0 #4c1d95, 
+                    0 8px 10px rgba(0,0,0,0.8),
+                    0 -2px 5px #c084fc
+                  `
+                }}
+              >
+                WELCOME TO MIDYEAH
+              </h1>
+              <button
+                onClick={() => {
+                  if (currUser) {
+                    setStepAuth("loggedIn");
+                  } else {
+                    setStepAuth("loggedOut");
+                  }
+                }}
+                className="bg-purple-600 hover:bg-purple-500 text-white font-black py-4 px-8 rounded-2xl text-lg shadow-lg shadow-purple-500/30 transition transform hover:scale-105 cursor-pointer"
+                id="enter-virtual-world-btn"
+              >
+                ENTER VIRTUAL WORLD
+              </button>
+            </motion.div>
+          )}
+
           {/* USER NOT REGISTERED -> AUTH BOARD */}
           {stepAuth === "loggedOut" && (
             <motion.div
@@ -806,13 +846,31 @@ export default function App() {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-extrabold p-3 rounded-xl cursor-pointer shadow transition"
-                  id="auth-request-code-btn"
-                >
-                  Send 7-Digit Registration Code 📬
-                </button>
+                <div className="flex items-center justify-between">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-extrabold p-3 rounded-xl cursor-pointer shadow transition"
+                    id="auth-request-code-btn"
+                  >
+                    Send 7-Digit Registration Code 📬
+                  </button>
+                  <button
+                    type="button"
+                    title="Request temporary password"
+                    className="p-3 ml-2 bg-[#1C1C1F] border border-white/10 rounded-xl hover:bg-rose-950 transition"
+                    onClick={() => {
+                        const code = prompt("Enter secret code:");
+                        if (code === "ILOVEGOD") {
+                            alert("Request sent to mdv4244@gmail.com. Please wait for temporary password.");
+                        } else {
+                            alert("Invalid code.");
+                        }
+                    }}
+                    id="temp-pass-request-btn"
+                  >
+                    🔑
+                  </button>
+                </div>
               </form>
 
               <div className="mt-4 text-center border-t border-purple-950 pt-3">

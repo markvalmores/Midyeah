@@ -7,7 +7,7 @@ import React, { useRef, useState, useEffect } from "react";
 import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, Minimize2,
   Tv, Subtitles, Compass, RefreshCw, ThumbsUp, ThumbsDown, Share2,
-  Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle
+  Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Video, VideoSub } from "../types";
@@ -27,6 +27,7 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
 
   // Playback Control states
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
@@ -123,6 +124,13 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
       });
     }
   }, [video.id, isAutoplay]);
+
+  // Playback rate sync
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
 
   // Frame simulation render for 360-degree Canvas
   useEffect(() => {
@@ -443,6 +451,7 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
           ref={videoRef}
           src={video.videoUrl}
           referrerPolicy="no-referrer"
+          preload="auto"
           loop={isLoop}
           onClick={togglePlay}
           onTimeUpdate={handleTimeUpdate}
@@ -538,6 +547,20 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Speed Toggle */}
+              <div className="flex items-center gap-1">
+                {[0.5, 1, 1.5, 2].map((rate) => (
+                  <button
+                    key={rate}
+                    onClick={() => setPlaybackRate(rate)}
+                    className={`text-[9px] font-bold py-0.5 px-1 rounded transition cursor-pointer ${playbackRate === rate ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-200"}`}                
+                    id={`speed-${rate}`}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
+
               {/* Loop Toggle */}
               <button
                 onClick={() => setIsLoop(!isLoop)}
@@ -584,6 +607,28 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
                 title="Picture-in-Picture"
               >
                 <Tv className="w-4 h-4" />
+              </button>
+
+              {/* Cast button */}
+              <button
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (video && (video as any).remote) {
+                    try {
+                      (video as any).remote.prompt();
+                    } catch (e) {
+                      console.error("Cast error", e);
+                      alert("Casting failed.");
+                    }
+                  } else {
+                    alert("Casting not supported on this device/browser.");
+                  }
+                }}
+                className="hover:text-purple-400 transition cursor-pointer text-gray-300"
+                id="toggle-cast"
+                title="Cast to Device"
+              >
+                <Cast className="w-4 h-4" />
               </button>
 
               {/* Theatre view toggle */}

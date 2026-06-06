@@ -31,7 +31,8 @@ export default function RadioPlayer() {
       streamUrl: "https://mbc-loveradio.streamguys1.com/loveradio",
       fallbackUrl: "https://stream.zeno.fm/5fscq7nt3veuv",
       logo: "💝",
-      country: "philippines"
+      country: "philippines",
+      youtubeChannelId: "UCJ9Lq7J2k8w9j1y1w1w1w1w"
     },
     {
       id: "ph_easy",
@@ -40,7 +41,8 @@ export default function RadioPlayer() {
       streamUrl: "https://mbc-easyrock.streamguys1.com/easyrock",
       fallbackUrl: "https://stream.zeno.fm/p2bky8gshs8uv",
       logo: "☕",
-      country: "philippines"
+      country: "philippines",
+      youtubeChannelId: "UCJ9Lq7J2k8w9j1y1w1w1w2w"
     },
     {
       id: "ph_yes",
@@ -49,7 +51,8 @@ export default function RadioPlayer() {
       streamUrl: "https://mbc-yesfm.streamguys1.com/yesfm",
       fallbackUrl: "https://stream.zeno.fm/v8tky8gshs8uv",
       logo: "💃",
-      country: "philippines"
+      country: "philippines",
+      youtubeChannelId: "UCJ9Lq7J2k8w9j1y1w1w1w3w"
     },
     {
       id: "ph_wish",
@@ -58,7 +61,8 @@ export default function RadioPlayer() {
       streamUrl: "https://stream.zeno.fm/cv8u190zkheuv",
       fallbackUrl: "https://stream.zeno.fm/b585mzv6kheuv",
       logo: "🌸",
-      country: "philippines"
+      country: "philippines",
+      youtubeChannelId: "UCJ9Lq7J2k8w9j1y1w1w1w4w"
     },
     {
       id: "ph_barangay",
@@ -67,7 +71,8 @@ export default function RadioPlayer() {
       streamUrl: "https://stream.zeno.fm/0mscq7nt3veuv",
       fallbackUrl: "https://stream.zeno.fm/h2vqyqqf4u8uv",
       logo: "🎙️",
-      country: "philippines"
+      country: "philippines",
+      youtubeChannelId: "UCJ9Lq7J2k8w9j1y1w1w1w5w"
     },
     {
       id: "ph_dwiz",
