@@ -96,6 +96,7 @@ export interface RadioStation {
   genre: string;
   streamUrl: string;
   logo: string;
+  country: string; // Country filter tag, e.g. "philippines", "japan", "usa", "uk", "france", "germany", "australia"
 }
 
 export interface Playlist {
