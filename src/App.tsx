@@ -625,8 +625,14 @@ export default function App() {
 
   // Profile upgrader
   const handleProfileUpdate = async (prof: UserProfile) => {
-    await saveProfile(prof);
-    setCurrUser(prof);
+    try {
+      await saveProfile(prof);
+    } catch (err: any) {
+      console.error("Profile save failed:", err);
+      alert("Error saving profile to database: " + err.message);
+    } finally {
+      setCurrUser(prof);
+    }
   };
 
   const handleAddVideoToPlaylist = async (playlistId: string, video: Video) => {

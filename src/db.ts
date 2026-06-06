@@ -10,7 +10,8 @@ import {
 } from "firebase/auth";
 import { 
   getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
-  query, orderBy, getDocFromServer, collectionGroup, onSnapshot
+  query, orderBy, getDocFromServer, collectionGroup, onSnapshot,
+  where, writeBatch, updateDoc
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { Video, UserProfile, Comment, DiscordMessage, Playlist, DonationRecord, DonationStats } from "./types";
@@ -361,38 +362,56 @@ let lastSavedProfile = new Map<string, string>(); // email -> JSON.stringify(pro
 // Profile Sync functions
 export async function saveProfile(profile: UserProfile): Promise<void> {
   // Save locally
-  const localDb = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = localDb.transaction("profiles", "readwrite");
-    tx.objectStore("profiles").put(profile);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  try {
+    const localDb = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      let tx;
+      try {
+        tx = localDb.transaction("profiles", "readwrite");
+        tx.objectStore("profiles").put(profile);
+      } catch (err) {
+        return reject(err);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (localErr) {
+    console.error("IndexedDB save failed:", localErr);
+  }
+
+  // Deduplication check: compare with last saved state
+  const profileKey = profile.email;
+  const currentSerialized = JSON.stringify(profile);
+  if (lastSavedProfile.get(profileKey) === currentSerialized) {
+    return; // No changes, skip Firestore network requests
+  }
 
   // Save globally in Firestore profiles collection
   try {
     const docRef = doc(db, "profiles", profile.email);
     await setDoc(docRef, { ...profile });
 
-    // Cascade profile changes to all globally published videos in realtime
+    // Update cache
+    lastSavedProfile.set(profileKey, currentSerialized);
+
+    // Cascade profile changes to user's videos in global_videos safely
     try {
       const collRef = collection(db, "global_videos");
-      const snap = await getDocs(collRef);
-      const updates: Promise<void>[] = [];
-      snap.forEach(docSnap => {
-        const dv = docSnap.data();
-        if (dv.creator && dv.creator.email === profile.email) {
-          updates.push(setDoc(doc(db, "global_videos", dv.id), {
-            ...dv,
+      const q = query(collRef, where("creator.email", "==", profile.email));
+      const snap = await getDocs(q);
+      
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.forEach(docSnap => {
+          batch.update(doc(db, "global_videos", docSnap.id), {
             creator: profile
-          }));
-        }
-      });
-      await Promise.all(updates);
+          });
+        });
+        await batch.commit();
+      }
     } catch (ve) {
       console.warn("Could not cascade profile update to videos:", ve);
     }
-
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
       console.warn("Firestore quota used, synced locally.", err);
