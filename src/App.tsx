@@ -48,6 +48,8 @@ export default function App() {
   const [stepAuth, setStepAuth] = useState<"startScreen" | "loggedOut" | "inputCode" | "onboard" | "loggedIn">("startScreen");
   const [verificationCode, setVerificationCode] = useState("");
   const [authCodeSent, setAuthCodeSent] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationProgress, setVerificationProgress] = useState(0);
 
   // Tutorial overlay
   const [showTutorial, setShowTutorial] = useState(false);
@@ -378,9 +380,12 @@ export default function App() {
   const verifyRegisteredCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (verificationCode === authCodeSent) {
+      setIsVerifying(true);
+      setVerificationProgress(20);
       try {
         // Authenticate inside Firebase Auth system before writing to Firestore
         await authenticateUser(emailInput, passInput);
+        setVerificationProgress(50);
 
         // Retrieve a custom dynamic anime profile picture from multiple APIs
         let randomAnimeAvatar = "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=150&q=80";
@@ -403,10 +408,19 @@ export default function App() {
         };
 
         await saveProfile(prof);
+        setVerificationProgress(85);
+        
+        // Final polish wait
+        await new Promise(r => setTimeout(r, 600));
+        setVerificationProgress(100);
+
+        await new Promise(r => setTimeout(r, 300));
         setCurrUser(prof);
         setStepAuth("loggedIn");
         setShowTutorial(false);
       } catch (err: any) {
+        setIsVerifying(false);
+        setVerificationProgress(0);
         console.error("Failed to authenticate or save profile:", err);
         alert(`Authentication Error: ${err.message || err}`);
       }
@@ -911,13 +925,27 @@ export default function App() {
                 
                 <p className="text-[10px] text-gray-400">Simulation Hint: Copy code tag <b>{authCodeSent}</b> to proceed!</p>
 
-                <button
-                  type="submit"
-                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-2.5 rounded-xl cursor-pointer transition shadow"
-                  id="verify-reg-code-btn"
-                >
-                  Verify and Join Platform ☕
-                </button>
+                {isVerifying ? (
+                  <div className="space-y-2">
+                    <div className="w-full bg-purple-950 rounded-full h-2.5 overflow-hidden">
+                      <div 
+                        className="bg-purple-500 h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${verificationProgress}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-[10px] text-purple-300 text-center font-bold">
+                      {verificationProgress < 100 ? `Verifying... ${Math.round(verificationProgress)}%` : "Redirecting to Platform..."}
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-2.5 rounded-xl cursor-pointer transition shadow"
+                    id="verify-reg-code-btn"
+                  >
+                    Verify and Join Platform ☕
+                  </button>
+                )}
               </form>
             </motion.div>
           )}
