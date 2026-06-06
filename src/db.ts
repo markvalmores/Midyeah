@@ -195,7 +195,7 @@ export function base64ToBlob(base64Data: string, contentType: string = "video/mp
   return new Blob(byteArrays, { type: contentType });
 }
 
-async function uploadVideoInChunks(videoId: string, blob: Blob): Promise<void> {
+async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p: number) => void): Promise<void> {
   try {
     const RAW_CHUNK_SIZE = 500 * 1024; // 500KB raw binary size - highly resilient to network flutters & timeouts
     const numChunks = Math.ceil(blob.size / RAW_CHUNK_SIZE);
@@ -214,6 +214,12 @@ async function uploadVideoInChunks(videoId: string, blob: Blob): Promise<void> {
         data: chunkData
       });
       
+      if (onProgress) {
+        // Calculate progress from 92 to 100
+        const progress = 92 + Math.round(((i + 1) / numChunks) * 8);
+        onProgress(Math.min(progress, 100));
+      }
+
       // Allow general render frames & touch events to dispatch smoothly
       await new Promise(r => setTimeout(r, 15));
     }
@@ -376,7 +382,7 @@ export async function getProfile(email: string): Promise<UserProfile | null> {
 }
 
 // Video Sync functions
-export async function saveVideo(video: Video, videoBlob?: Blob): Promise<void> {
+export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p: number) => void): Promise<void> {
   // Save locally in IndexedDB first (completes instantly, <10ms, working and available 100% offline)
   const localDb = await openDB();
   await new Promise<void>((resolve, reject) => {
@@ -433,7 +439,7 @@ export async function saveVideo(video: Video, videoBlob?: Blob): Promise<void> {
     // Delegate the heavy chunk transmission to the background queue, resolving this sync instantly
     const blobToUpload = videoBlob || video.blob;
     if (blobToUpload) {
-      uploadVideoInChunks(video.id, blobToUpload).catch((err) => {
+      uploadVideoInChunks(video.id, blobToUpload, onProgress).catch((err) => {
         console.warn("Asynchronous database chunk upload deferred:", err);
       });
     }

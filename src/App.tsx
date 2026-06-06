@@ -504,8 +504,10 @@ export default function App() {
       setUploadProgress(92);
       setUploadStage("Writing ledger index tables...");
 
-      // Save persistently to IDB
-      await saveVideo(newVideo, uploadFile);
+      await saveVideo(newVideo, uploadFile, (p) => {
+        setUploadProgress(p);
+        setUploadStage(`Writing ledger index tables... ${p}%`);
+      });
       
       await sleep(300);
       setUploadProgress(100);
