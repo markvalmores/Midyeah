@@ -64,10 +64,11 @@ export default function App() {
       if (currentVideo?.id === id) {
         setCurrentVideo(null);
       }
+    } catch (err) {
+      console.error("Deletion error:", err);
+    } finally {
       setDeletingVideoId(null);
       reloadVideos();
-    } catch (err) {
-      console.error(err);
     }
   };
 

@@ -516,21 +516,23 @@ export async function deleteVideo(id: string): Promise<void> {
     objectUrlCache.delete(id);
   }
 
-  // Local delete
-  const localDb = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = localDb.transaction("videos", "readwrite");
-    tx.objectStore("videos").delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-
-  // Remote delete
+  // Local delete in IndexedDB (prioritized for immediate responsiveness)
   try {
-    await deleteDoc(doc(db, "global_videos", id));
-  } catch (err) {
-    console.error("Could not delete from global network:", err);
+    const localDb = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = localDb.transaction("videos", "readwrite");
+      tx.objectStore("videos").delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (localErr) {
+    console.warn("Local IndexedDB video deletion bypass or warning:", localErr);
   }
+
+  // Remote Firestore delete (non-blocking so slow network / rule restrictions never hand/freeze the active UI)
+  deleteDoc(doc(db, "global_videos", id)).catch(err => {
+    console.error("Could not delete from global network:", err);
+  });
 }
 
 export async function clearAllVideos(): Promise<void> {
