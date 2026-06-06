@@ -261,6 +261,20 @@ export default function App() {
   useEffect(() => {
     openDB().then(() => {
       reloadVideos();
+
+      // Instant local-first session restoration on initial boot
+      const savedEmail = localStorage.getItem("midyeah_active_session_email");
+      if (savedEmail) {
+        getProfile(savedEmail).then((profile) => {
+          if (profile) {
+            setCurrUser(profile);
+            setStepAuth("loggedIn");
+            reloadPlaylists(profile.email);
+          }
+        }).catch(err => {
+          console.warn("Could not instantly pre-load active offline session:", err);
+        });
+      }
     });
   }, []);
 
@@ -280,6 +294,7 @@ export default function App() {
         try {
           const profile = await getProfile(firebaseUser.email);
           if (profile) {
+            localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
             setCurrUser(profile);
             setStepAuth("loggedIn");
             reloadPlaylists(profile.email);
@@ -295,6 +310,7 @@ export default function App() {
               coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
               subscribersCount: 775
             };
+            localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
             setCurrUser(prof);
             setStepAuth("loggedIn");
             reloadPlaylists(prof.email);
@@ -303,6 +319,19 @@ export default function App() {
           console.error("Failed to load authenticated user profile:", e);
         }
       } else {
+        // If there's an active local session, preserve it to survive updates, rebuilds, or network blips
+        const savedEmail = localStorage.getItem("midyeah_active_session_email");
+        if (savedEmail) {
+          getProfile(savedEmail).then((profile) => {
+            if (profile) {
+              setCurrUser(profile);
+              setStepAuth("loggedIn");
+              reloadPlaylists(profile.email);
+            }
+          });
+          return;
+        }
+
         // Clear authenticated session, check if there's an offline guest fallback
         getProfile("guest@midyeah.com").then((profile) => {
           if (profile) {
@@ -537,6 +566,7 @@ export default function App() {
     try {
       const { signOut } = await import("firebase/auth");
       await signOut(auth);
+      localStorage.removeItem("midyeah_active_session_email");
       setCurrUser(null);
       setStepAuth("loggedOut");
       setActiveTab("home");
@@ -550,6 +580,7 @@ export default function App() {
     if (!currUser?.email) return;
     try {
       await deleteProfileFromDb(currUser.email);
+      localStorage.removeItem("midyeah_active_session_email");
       setCurrUser(null);
       setStepAuth("loggedOut");
       setActiveTab("home");
