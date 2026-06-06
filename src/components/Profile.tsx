@@ -199,6 +199,7 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
               placeholder="Edit Cover Image URL"
               value={coverUrl}
               onChange={(e) => setCoverUrl(e.target.value)}
+              onBlur={handleBlur}
               className="bg-transparent border-none outline-none text-[10px] w-32 focus:w-48 transition-all text-white font-mono"
               id="cover-url-input"
             />
