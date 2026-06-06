@@ -219,9 +219,6 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
         const progress = Math.round(((i + 1) / numChunks) * 100);
         onProgress(Math.min(progress, 100));
       }
-
-      // Allow general render frames & touch events to dispatch smoothly
-      await new Promise(r => setTimeout(r, 15));
     }
   } catch (err) {
     console.warn("Incremental global video sync paused or deferred:", err);
@@ -436,15 +433,14 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
     const docRef = doc(db, "global_videos", video.id);
     await setDoc(docRef, videoToSave);
     
-    // Delegate the heavy chunk transmission to the background queue, resolving this sync instantly
+    // Delegate the heavy chunk transmission and AWAIT it to ensure it completes successfully
     const blobToUpload = videoBlob || video.blob;
     if (blobToUpload) {
-      uploadVideoInChunks(video.id, blobToUpload, onProgress).catch((err) => {
-        console.warn("Asynchronous database chunk upload deferred:", err);
-      });
+      await uploadVideoInChunks(video.id, blobToUpload, onProgress);
     }
   } catch (err) {
-    console.warn("Firestore video synchronization postponed, but media files are safely secured inside high-fidelity client IndexedDB:", err);
+    console.warn("Firestore video synchronization failed:", err);
+    throw err; // Ensure the caller knows it failed
   }
 }
 
