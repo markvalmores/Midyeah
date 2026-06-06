@@ -302,21 +302,24 @@ export default function App() {
             // Do not automatically set stepAuth here
             reloadPlaylists(profile.email);
           } else {
-            // Fallback: Generate dynamic user profile document if none exists in Firestore
-            const prof: UserProfile = {
-              username: firebaseUser.email.split("@")[0],
-              email: firebaseUser.email,
-              channelName: firebaseUser.email.split("@")[0].toUpperCase() + " STATIONS",
-              channelUrl: firebaseUser.email.split("@")[0] + "_ch",
-              bio: "Thank you for watching on Midyeah, God bless everyone!",
-              avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
-              coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-              subscribersCount: 775
-            };
-            localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
-            setCurrUser(prof);
-            // Do not automatically set stepAuth here
-            reloadPlaylists(prof.email);
+            // Only generate a default profile if no local session exists, to prevent overwriting existing user data
+            const savedEmail = localStorage.getItem("midyeah_active_session_email");
+            if (!savedEmail) {
+              const prof: UserProfile = {
+                username: firebaseUser.email.split("@")[0],
+                email: firebaseUser.email,
+                channelName: firebaseUser.email.split("@")[0].toUpperCase() + " STATIONS",
+                channelUrl: firebaseUser.email.split("@")[0] + "_ch",
+                bio: "Thank you for watching on Midyeah, God bless everyone!",
+                avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+                coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+                subscribersCount: 775
+              };
+              localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
+              setCurrUser(prof);
+              // Do not automatically set stepAuth here
+              reloadPlaylists(prof.email);
+            }
           }
         } catch (e) {
           console.error("Failed to load authenticated user profile:", e);
