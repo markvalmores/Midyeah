@@ -404,8 +404,8 @@ export default function App() {
 
         await saveProfile(prof);
         setCurrUser(prof);
-        setStepAuth("onboard");
-        setShowTutorial(true);
+        setStepAuth("loggedIn");
+        setShowTutorial(false);
       } catch (err: any) {
         console.error("Failed to authenticate or save profile:", err);
         alert(`Authentication Error: ${err.message || err}`);
