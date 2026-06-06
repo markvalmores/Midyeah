@@ -16,7 +16,8 @@ import { Video, UserProfile, Comment, Playlist } from "./types";
 import { 
   subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
-  getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount
+  getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount,
+  subscribeVideoComments
 } from "./db";
 
 import Mascot from "./components/Mascot";
@@ -132,20 +133,19 @@ export default function App() {
     window.scrollTo({ top: 120, behavior: "smooth" });
   };
 
-  // Fetch comments for any selected video
+  // Fetch comments for any selected video in real-time
   useEffect(() => {
+    let unsubscribe = () => {};
     if (currentVideo) {
       setIsLoadingComments(true);
-      getVideoComments(currentVideo.id).then((items) => {
+      unsubscribe = subscribeVideoComments(currentVideo.id, (items) => {
         setComments(items || []);
-        setIsLoadingComments(false);
-      }).catch((err) => {
-        console.error("Could not fetch comments:", err);
         setIsLoadingComments(false);
       });
     } else {
       setComments([]);
     }
+    return () => unsubscribe();
   }, [currentVideo]);
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -1353,9 +1353,11 @@ export default function App() {
                             </div>
                             <VideoPlayer
                               video={currentVideo}
+                              currUser={currUser}
                               onDownload={handleDownloadVideo}
                               onSaveToLibrary={handleSaveToMidyeahLibrary}
                               isDownloaded={downloadedIds.includes(currentVideo.id)}
+                              onSetTab={(tab) => setActiveTab(tab as any)}
                             />
 
                             {/* PUBLIC COMMENTS SECTION - YouTube styled */}
@@ -1734,7 +1736,7 @@ export default function App() {
                     <SupportTab currUser={currUser} />
                   )}
 
-                  {activeTab === "community" && <DiscordChat />}
+                  {activeTab === "community" && <DiscordChat currUser={currUser} />}
 
                 {activeTab === "profile" && currUser && (
                   <Profile 

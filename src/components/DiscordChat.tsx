@@ -7,10 +7,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { Hash, MessageSquare, Send, Bell, Settings, HelpCircle, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getDiscordMessages, saveDiscordMessage, db } from "../db";
-import { DiscordMessage } from "../types";
+import { DiscordMessage, UserProfile } from "../types";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
-export default function DiscordChat() {
+interface DiscordChatProps {
+  currUser: UserProfile | null;
+}
+
+export default function DiscordChat({ currUser }: DiscordChatProps) {
   const [activeChannel, setActiveChannel] = useState("general");
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
   const [inputText, setInputText] = useState("");
@@ -66,8 +70,8 @@ export default function DiscordChat() {
 
     const newMsg: DiscordMessage = {
       id: "msg-" + Date.now(),
-      username: "You (Active Watcher/Creator)",
-      avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=40&q=40",
+      username: currUser?.username || "Guest Watcher",
+      avatarUrl: currUser?.avatarUrl || "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
       text: inputText,
       timestamp: new Date().toISOString()
     };

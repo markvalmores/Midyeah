@@ -10,18 +10,20 @@ import {
   Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast, FolderHeart
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Video, VideoSub } from "../types";
-import { savePlayOffset, getPlayOffset, saveVideo } from "../db";
+import { Video, VideoSub, UserProfile } from "../types";
+import { savePlayOffset, getPlayOffset, saveVideo, toggleSubscription, checkSubscriptionStatus, toggleGroupMembership, checkGroupStatus } from "../db";
 
 interface VideoPlayerProps {
   video: Video;
+  currUser: UserProfile | null;
   onDownload: (v: Video, res: string) => void;
   onSaveToLibrary: (v: Video) => void;
   isDownloaded: boolean;
   onVideoEnd?: () => void;
+  onSetTab?: (tab: string) => void;
 }
 
-export default function VideoPlayer({ video, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd }: VideoPlayerProps) {
+export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd, onSetTab }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,6 +56,8 @@ export default function VideoPlayer({ video, onDownload, onSaveToLibrary, isDown
   const [reactCounts, setReactCounts] = useState(video.reactions);
   const [viewsCount, setViewsCount] = useState(video.views);
   const [hasRated, setHasRated] = useState<"like" | "dislike" | null>(null);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isGroupMember, setIsGroupMember] = useState(false);
 
   // Subtitles generator (generates AI voice-over guess captions based on video criteria)
   const [aiSubtitles, setAiSubtitles] = useState<VideoSub[]>([]);
@@ -68,6 +72,11 @@ export default function VideoPlayer({ video, onDownload, onSaveToLibrary, isDown
     const newViews = (video.views || 0) + 1;
     setViewsCount(newViews); // bump views
     setReactCounts(video.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 });
+
+    if (currUser) {
+      checkSubscriptionStatus(currUser.email, video.creator.email).then(setIsSubscribed);
+      checkGroupStatus(currUser.email, video.creator.channelUrl || "midyeah_group").then(setIsGroupMember);
+    }
 
     // Sync views bump globally
     const updatedVideo = {
@@ -812,44 +821,53 @@ export default function VideoPlayer({ video, onDownload, onSaveToLibrary, isDown
           <div className="flex items-center gap-2">
             <button
               onClick={async () => {
+                if (!currUser) {
+                  alert("Please sign in to subscribe!");
+                  return;
+                }
                 try {
-                  const { getProfile, saveProfile } = await import("../db");
-                  const currentCreatorProfile = await getProfile(video.creator.email);
-                  if (currentCreatorProfile) {
-                    const newCount = (currentCreatorProfile.subscribersCount || 0) + 1;
-                    const updatedProfile = {
-                      ...currentCreatorProfile,
-                      subscribersCount: newCount
-                    };
-                    await saveProfile(updatedProfile);
-                    alert(`Subscribed! ${updatedProfile.channelName} now has ${newCount} members.`);
+                  const status = await toggleSubscription(currUser.email, video.creator.email);
+                  setIsSubscribed(status);
+                  if (status) {
+                    alert(`✅ Subscribed to ${video.creator.channelName}!`);
                   } else {
-                    const newCount = (video.creator.subscribersCount || 0) + 1;
-                    const updatedVideo = {
-                      ...video,
-                      creator: {
-                        ...video.creator,
-                        subscribersCount: newCount
-                      }
-                    };
-                    await saveVideo(updatedVideo);
-                    alert(`Subscribed! ${video.creator.channelName} now has ${newCount} subscribers.`);
+                    alert(`⭕ Unsubscribed from ${video.creator.channelName}.`);
                   }
-                } catch(e) {
+                } catch (e) {
                   console.error(e);
-                  alert("Failed to subscribe.");
+                  alert("Failed to update subscription.");
                 }
               }}
-              className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-full shadow cursor-pointer transition"
+              className={`${isSubscribed ? "bg-slate-700 hover:bg-slate-600" : "bg-purple-600 hover:bg-purple-500"} text-white font-bold text-xs px-3.5 py-1.5 rounded-full shadow cursor-pointer transition`}
               id="subscribe-channel-btn"
             >
-              Subscribe
+              {isSubscribed ? "Subscribed" : "Subscribe"}
             </button>
             <button
-              className="bg-transparent hover:bg-purple-950/30 text-purple-300 border border-purple-800 text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition"
+              onClick={async () => {
+                if (!currUser) {
+                  alert("Please sign in to join groups!");
+                  return;
+                }
+                try {
+                  const groupId = video.creator.channelUrl || "midyeah_group";
+                  const status = await toggleGroupMembership(currUser.email, groupId);
+                  setIsGroupMember(status);
+                  if (status) {
+                    alert(`✨ Joined ${video.creator.channelName}'s group! Redirecting to group chat...`);
+                    if (onSetTab) onSetTab("community");
+                  } else {
+                    alert(`⭕ Left ${video.creator.channelName}'s group.`);
+                  }
+                } catch (e) {
+                  console.error(e);
+                  alert("Failed to update group membership.");
+                }
+              }}
+              className={`${isGroupMember ? "bg-slate-800 text-slate-300" : "bg-transparent text-purple-300"} hover:bg-purple-950/30 border border-purple-800 text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition`}
               id="join-channel-btn"
             >
-              Join Group
+              {isGroupMember ? "In Group" : "Join Group"}
             </button>
           </div>
         </div>

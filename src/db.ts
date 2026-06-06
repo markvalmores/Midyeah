@@ -11,7 +11,7 @@ import {
 import { 
   getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
   query, orderBy, getDocFromServer, collectionGroup, onSnapshot,
-  where, writeBatch, updateDoc
+  where, writeBatch, updateDoc, increment
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { Video, UserProfile, Comment, DiscordMessage, Playlist, DonationRecord, DonationStats } from "./types";
@@ -785,21 +785,135 @@ export async function getVideoComments(videoId: string): Promise<Comment[]> {
     return result;
   } catch (err) {
     console.warn("Could not fetch remote comments, using local IndexedDB:", err);
+    // Local comments fallback
+    const localDb = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = localDb.transaction("comments", "readonly");
+      const req = tx.objectStore("comments").getAll();
+      req.onsuccess = () => {
+        const all: Comment[] = req.result || [];
+        const filtered = all.filter(c => c.videoId === videoId);
+        filtered.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        resolve(filtered);
+      };
+      req.onerror = () => reject(req.error);
+    });
   }
+}
 
-  // Local comments fallback
-  const localDb = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = localDb.transaction("comments", "readonly");
-    const req = tx.objectStore("comments").getAll();
-    req.onsuccess = () => {
-      const all: Comment[] = req.result || [];
-      const filtered = all.filter(c => c.videoId === videoId);
-      filtered.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-      resolve(filtered);
-    };
-    req.onerror = () => reject(req.error);
+export function subscribeVideoComments(videoId: string, callback: (comments: Comment[]) => void): () => void {
+  const collRef = collection(db, "global_videos", videoId, "comments");
+  const q = query(collRef, orderBy("timestamp", "desc"));
+  
+  return onSnapshot(q, (snap) => {
+    const result: Comment[] = [];
+    snap.forEach(docSnap => {
+      const data = docSnap.data();
+      result.push({
+        id: data.id,
+        videoId: data.videoId,
+        username: data.username,
+        avatarUrl: data.avatarUrl,
+        text: data.text,
+        timestamp: data.timestamp,
+        likes: data.likes || 0,
+        replies: []
+      });
+    });
+    callback(result);
+  }, (err) => {
+    console.warn("Real-time comment subscription issue:", err);
   });
+}
+
+// Subscription & Follower Logic
+export async function toggleSubscription(followerEmail: string, followedEmail: string): Promise<boolean> {
+  if (followerEmail === followedEmail) return false;
+  
+  const subId = `${followerEmail}_follows_${followedEmail}`;
+  const subRef = doc(db, "subscriptions", subId);
+  const profileRef = doc(db, "profiles", followedEmail);
+  
+  try {
+    const subSnap = await getDoc(subRef);
+    const batch = writeBatch(db);
+    
+    let isNowSubscribed = false;
+    
+    if (subSnap.exists()) {
+      // Unsubscribe
+      batch.delete(subRef);
+      batch.update(profileRef, {
+        subscribersCount: increment(-1)
+      });
+      isNowSubscribed = false;
+    } else {
+      // Subscribe
+      batch.set(subRef, {
+        followerEmail,
+        followedEmail,
+        timestamp: new Date().toISOString()
+      });
+      batch.update(profileRef, {
+        subscribersCount: increment(1)
+      });
+      isNowSubscribed = true;
+    }
+    
+    await batch.commit();
+    return isNowSubscribed;
+  } catch (err) {
+    console.error("Failed to toggle subscription:", err);
+    throw err;
+  }
+}
+
+export async function checkSubscriptionStatus(followerEmail: string, followedEmail: string): Promise<boolean> {
+  const subId = `${followerEmail}_follows_${followedEmail}`;
+  const subRef = doc(db, "subscriptions", subId);
+  try {
+    const subSnap = await getDoc(subRef);
+    return subSnap.exists();
+  } catch (err) {
+    console.warn("Could not check subscription status:", err);
+    return false;
+  }
+}
+
+// Group Membership Logic
+export async function toggleGroupMembership(email: string, groupId: string): Promise<boolean> {
+  const membershipId = `${email}_in_${groupId}`;
+  const membershipRef = doc(db, "group_memberships", membershipId);
+  
+  try {
+    const memSnap = await getDoc(membershipRef);
+    if (memSnap.exists()) {
+      await deleteDoc(membershipRef);
+      return false;
+    } else {
+      await setDoc(membershipRef, {
+        email,
+        groupId,
+        joinedAt: new Date().toISOString()
+      });
+      return true;
+    }
+  } catch (err) {
+    console.error("Failed to toggle group membership:", err);
+    throw err;
+  }
+}
+
+export async function checkGroupStatus(email: string, groupId: string): Promise<boolean> {
+  const membershipId = `${email}_in_${groupId}`;
+  const membershipRef = doc(db, "group_memberships", membershipId);
+  try {
+    const memSnap = await getDoc(membershipRef);
+    return memSnap.exists();
+  } catch (err) {
+    console.warn("Could not check group status:", err);
+    return false;
+  }
 }
 
 // Discord Messages Sync functions (global community chats)
