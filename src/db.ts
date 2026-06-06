@@ -215,8 +215,8 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
       });
       
       if (onProgress) {
-        // Calculate progress from 92 to 100
-        const progress = 92 + Math.round(((i + 1) / numChunks) * 8);
+        // Calculate progress from 0 to 100
+        const progress = Math.round(((i + 1) / numChunks) * 100);
         onProgress(Math.min(progress, 100));
       }
 

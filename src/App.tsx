@@ -501,12 +501,11 @@ export default function App() {
       }
 
       await sleep(200);
-      setUploadProgress(92);
-      setUploadStage("Writing ledger index tables...");
+      setUploadStage("Uploading...");
 
       await saveVideo(newVideo, uploadFile, (p) => {
         setUploadProgress(p);
-        setUploadStage(`Writing ledger index tables... ${p}%`);
+        setUploadStage(`Uploading... ${p}%`);
       });
       
       await sleep(300);
