@@ -7,16 +7,16 @@ import React, { useState, useEffect } from "react";
 import {
   Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
-  Trash2, Check, X
+  Trash2, Check, X, FolderHeart, FolderPlus, Gift
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-import { Video, UserProfile } from "./types";
+import { Video, UserProfile, Comment, Playlist } from "./types";
 import { 
   getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
-  clearAllVideos, saveComment, getVideoComments 
+  clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
+  getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist
 } from "./db";
-import { Comment } from "./types";
 
 import Mascot from "./components/Mascot";
 import VideoPlayer from "./components/VideoPlayer";
@@ -27,12 +27,18 @@ import RadioPlayer from "./components/RadioPlayer";
 import Onboarding from "./components/Onboarding";
 import Profile from "./components/Profile";
 import DiscordChat from "./components/DiscordChat";
+import PlaylistsTab from "./components/PlaylistsTab";
+import SupportTab from "./components/SupportTab";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support">("home");
   const [isCreatorMode, setIsCreatorMode] = useState(false); // Switch between Watcher and Creator mode
   const [offlineMode, setOfflineMode] = useState(false); // Offline-Viewing only downloaded videos
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
+
+  // Custom User Playlists
+  const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
+  const [playlistDropdownForVid, setPlaylistDropdownForVid] = useState<string | null>(null);
 
   // Authentications
   const [currUser, setCurrUser] = useState<UserProfile | null>(null);
@@ -163,20 +169,67 @@ export default function App() {
   const [uploadRentalPeriod, setUploadRentalPeriod] = useState("month");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
-  // Hydrate initial database connection and verify user
+  // Hydrate initial database connection and load videos
   useEffect(() => {
     openDB().then(() => {
-      // Reload video inventory
       reloadVideos();
-      
-      // Auto register current or retrievemdv
-      getProfile("guest@midyeah.com").then((profile) => {
-        if (profile) {
-          setCurrUser(profile);
-          setStepAuth("loggedIn");
-        }
-      });
     });
+  }, []);
+
+  const reloadPlaylists = async (email: string) => {
+    try {
+      const lists = await getPlaylistsByOwner(email);
+      setUserPlaylists(lists);
+    } catch (err) {
+      console.warn("Could not reload playlists in App:", err);
+    }
+  };
+
+  // Hydrate and synchronize active Firebase Auth sessions
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser?.email) {
+        try {
+          const profile = await getProfile(firebaseUser.email);
+          if (profile) {
+            setCurrUser(profile);
+            setStepAuth("loggedIn");
+            reloadPlaylists(profile.email);
+          } else {
+            // Fallback: Generate dynamic user profile document if none exists in Firestore
+            const prof: UserProfile = {
+              username: firebaseUser.email.split("@")[0],
+              email: firebaseUser.email,
+              channelName: firebaseUser.email.split("@")[0].toUpperCase() + " STATIONS",
+              channelUrl: firebaseUser.email.split("@")[0] + "_ch",
+              bio: "Thank you for watching on Midyeah, God bless everyone!",
+              avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+              coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+              subscribersCount: 775
+            };
+            setCurrUser(prof);
+            setStepAuth("loggedIn");
+            reloadPlaylists(prof.email);
+          }
+        } catch (e) {
+          console.error("Failed to load authenticated user profile:", e);
+        }
+      } else {
+        // Clear authenticated session, check if there's an offline guest fallback
+        getProfile("guest@midyeah.com").then((profile) => {
+          if (profile) {
+            setCurrUser(profile);
+            setStepAuth("loggedIn");
+            reloadPlaylists(profile.email);
+          } else {
+            setCurrUser(null);
+            setStepAuth("loggedOut");
+            setUserPlaylists([]);
+          }
+        });
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const reloadVideos = () => {
@@ -192,6 +245,11 @@ export default function App() {
     e.preventDefault();
     if (!emailInput.trim() || !passInput.trim()) return;
 
+    if (passInput.trim().length < 6) {
+      alert("Password must be at least 6 characters in length.");
+      return;
+    }
+
     // generate a cool, copyable 7-digit verification tag
     const code = Math.floor(1000000 + Math.random() * 9000000).toString();
     setAuthCodeSent(code);
@@ -199,26 +257,41 @@ export default function App() {
     setStepAuth("inputCode");
   };
 
-  const verifyRegisteredCode = (e: React.FormEvent) => {
+  const verifyRegisteredCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (verificationCode === authCodeSent) {
-      // Initialize layout profile
-      const prof: UserProfile = {
-        username: emailInput.split("@")[0],
-        email: emailInput,
-        channelName: emailInput.split("@")[0].toUpperCase() + " STATIONS",
-        channelUrl: emailInput.split("@")[0] + "_ch",
-        bio: "Thank you for watching on Midyeah, God bless everyone!",
-        avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
-        coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-        subscribersCount: 775 // starting statistics close to criteria triggers
-      };
+      try {
+        // Authenticate inside Firebase Auth system before writing to Firestore
+        await authenticateUser(emailInput, passInput);
 
-      saveProfile(prof).then(() => {
+        // Retrieve a custom dynamic anime profile picture from multiple APIs
+        let randomAnimeAvatar = "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=150&q=80";
+        try {
+          randomAnimeAvatar = await getAnyAnimeAvatarUrl();
+        } catch (avatarError) {
+          console.warn("Could not fetch random anime avatar, fallback loaded:", avatarError);
+        }
+
+        // Initialize layout profile
+        const prof: UserProfile = {
+          username: emailInput.split("@")[0],
+          email: emailInput,
+          channelName: emailInput.split("@")[0].toUpperCase() + " STATIONS",
+          channelUrl: emailInput.split("@")[0] + "_ch",
+          bio: "Thank you for watching on Midyeah, God bless everyone!",
+          avatarUrl: randomAnimeAvatar,
+          coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+          subscribersCount: 775 // starting statistics close to criteria triggers
+        };
+
+        await saveProfile(prof);
         setCurrUser(prof);
         setStepAuth("onboard");
         setShowTutorial(true);
-      });
+      } catch (err: any) {
+        console.error("Failed to authenticate or save profile:", err);
+        alert(`Authentication Error: ${err.message || err}`);
+      }
     } else {
       alert("Invalid 7-digit confirmation key. Please verify original code.");
     }
@@ -303,6 +376,56 @@ export default function App() {
     setCurrUser(prof);
   };
 
+  const handleAddVideoToPlaylist = async (playlistId: string, video: Video) => {
+    const list = userPlaylists.find(p => p.id === playlistId);
+    if (!list) return;
+
+    if (list.videoIds.includes(video.id)) {
+      alert(`💡 Video is already in playlist: ${list.name}`);
+      return;
+    }
+
+    const updatedVideoIds = [...list.videoIds, video.id];
+    const updatedList = { ...list, videoIds: updatedVideoIds };
+
+    try {
+      await updatePlaylist(updatedList);
+      setUserPlaylists(prev => prev.map(p => p.id === playlistId ? updatedList : p));
+      alert(`✅ Added '${video.title}' to playlist '${list.name}'`);
+    } catch (err) {
+      console.error("Failed to add video to playlist:", err);
+      alert("Error saving playlist. Check authorization rules.");
+    }
+  };
+
+  const handleLogOut = async () => {
+    try {
+      const { signOut } = await import("firebase/auth");
+      await signOut(auth);
+      setCurrUser(null);
+      setStepAuth("loggedOut");
+      setActiveTab("home");
+      setUserPlaylists([]);
+    } catch (err) {
+      console.error("Sign out fail:", err);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!currUser?.email) return;
+    try {
+      await deleteProfileFromDb(currUser.email);
+      setCurrUser(null);
+      setStepAuth("loggedOut");
+      setActiveTab("home");
+      setUserPlaylists([]);
+      alert("💥 Your account and records are permanently deleted. Goodbye, friend!");
+    } catch (err) {
+      console.error("Purge fail:", err);
+      alert("Failed to delete account. Please try again.");
+    }
+  };
+
   // Categories sort filter configurations
   const getFilteredVideosList = () => {
     let list = [...videosList];
@@ -382,12 +505,28 @@ export default function App() {
               <span className="hidden md:inline">Radio</span>
             </button>
             <button
+              onClick={() => { setActiveTab("playlists"); setCurrentVideo(null); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "playlists" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              id="nav-tab-playlists"
+            >
+              <FolderHeart className="w-4 h-4" />
+              <span className="hidden md:inline">Playlists</span>
+            </button>
+            <button
               onClick={() => { setActiveTab("community"); setCurrentVideo(null); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "community" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-community"
             >
               <Gamepad className="w-4 h-4" />
               <span className="hidden md:inline">Discord Circle</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab("support"); setCurrentVideo(null); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition ${activeTab === "support" ? "bg-rose-600 text-white shadow" : "text-rose-400 hover:text-rose-300"}`}
+              id="nav-tab-support"
+            >
+              <Gift className="w-4 h-4" />
+              <span className="hidden md:inline">Support & Charity 💖</span>
             </button>
           </nav>
         )}
@@ -968,7 +1107,52 @@ export default function App() {
                                     {vid.isOffline && <span className="text-emerald-400 font-semibold uppercase">• Offline</span>}
                                   </div>
 
-                                  <div onClick={(e) => e.stopPropagation()} className="relative text-xs">
+                                  <div onClick={(e) => e.stopPropagation()} className="relative text-xs flex items-center gap-1.5">
+                                    {currUser && (
+                                      <div className="relative">
+                                        <button
+                                          type="button"
+                                          onClick={() => setPlaylistDropdownForVid(playlistDropdownForVid === vid.id ? null : vid.id)}
+                                          className={`p-1 transition rounded hover:bg-white/5 cursor-pointer ${playlistDropdownForVid === vid.id ? "text-purple-400" : "text-slate-500 hover:text-purple-400"}`}
+                                          title="Add to Playlist"
+                                        >
+                                          <FolderPlus className="w-3.5 h-3.5" />
+                                        </button>
+
+                                        {playlistDropdownForVid === vid.id && (
+                                          <div className="absolute right-0 bottom-6 bg-[#121214] border border-white/10 p-2.5 rounded-2xl w-48 shadow-2xl z-30 space-y-1.5 text-left">
+                                            <div className="flex items-center justify-between border-b border-white/5 pb-1">
+                                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Select Playlist</span>
+                                              <button onClick={() => setPlaylistDropdownForVid(null)} className="p-0.5 hover:bg-white/5 rounded text-slate-500 hover:text-white">
+                                                <X className="w-2.5 h-2.5" />
+                                              </button>
+                                            </div>
+                                            {userPlaylists.length === 0 ? (
+                                              <div className="text-[9px] text-slate-500 text-center py-2 leading-relaxed">
+                                                No playlists. Create one in the Playlists tab!
+                                              </div>
+                                            ) : (
+                                              <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
+                                                {userPlaylists.map(playlist => (
+                                                  <button
+                                                    key={playlist.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                      handleAddVideoToPlaylist(playlist.id, vid);
+                                                      setPlaylistDropdownForVid(null);
+                                                    }}
+                                                    className="w-full text-left p-1 hover:bg-purple-600 hover:text-white transition rounded text-[10px] text-slate-400 truncate font-semibold cursor-pointer block"
+                                                  >
+                                                    📁 {playlist.name}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
                                     {deletingVideoId !== vid.id ? (
                                       <button
                                         type="button"
@@ -1016,10 +1200,23 @@ export default function App() {
 
                   {activeTab === "radio" && <RadioPlayer />}
 
+                  {activeTab === "playlists" && (
+                    <PlaylistsTab 
+                      currUser={currUser} 
+                      videosList={videosList} 
+                      onPlayVideo={(vid) => { handlePlayVideo(vid); }} 
+                      onSwitchTab={setActiveTab} 
+                    />
+                  )}
+
+                  {activeTab === "support" && (
+                    <SupportTab currUser={currUser} />
+                  )}
+
                   {activeTab === "community" && <DiscordChat />}
 
                   {activeTab === "profile" && currUser && (
-                    <Profile profile={currUser} onUpdate={handleProfileUpdate} />
+                    <Profile profile={currUser} onUpdate={handleProfileUpdate} onLogOut={handleLogOut} onDeleteAccount={handleDeleteAccount} />
                   )}
 
                 </div>

@@ -97,3 +97,32 @@ export interface RadioStation {
   streamUrl: string;
   logo: string;
 }
+
+export interface Playlist {
+  id: string;
+  name: string;
+  ownerEmail: string;
+  videoIds: string[];
+  createdAt: string;
+}
+
+export interface DonationRecord {
+  id: string;
+  donorName: string;
+  amount: number;
+  message: string;
+  target: "owner" | "charity" | "church" | "people";
+  timestamp: string;
+}
+
+export interface DonationStats {
+  totalAmountRaised: number;
+  totalDonationCount: number;
+  targetDistribution: {
+    owner: number;
+    charity: number;
+    church: number;
+    people: number;
+  };
+}
+

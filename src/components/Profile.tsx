@@ -14,9 +14,11 @@ import { UserProfile } from "../types";
 interface ProfileProps {
   profile: UserProfile;
   onUpdate: (updated: UserProfile) => void;
+  onLogOut?: () => void;
+  onDeleteAccount?: () => void;
 }
 
-export default function Profile({ profile, onUpdate }: ProfileProps) {
+export default function Profile({ profile, onUpdate, onLogOut, onDeleteAccount }: ProfileProps) {
   const [username, setUsername] = useState(profile.username);
   const [channelName, setChannelName] = useState(profile.channelName);
   const [channelUrl, setChannelUrl] = useState(profile.channelUrl);
@@ -31,6 +33,9 @@ export default function Profile({ profile, onUpdate }: ProfileProps) {
   // GCash & PayPal Withdrawal Setup
   const [gcash, setGcash] = useState(profile.gcash || "");
   const [paypal, setPaypal] = useState(profile.paypal || "");
+
+  // Delete account double confirmation flow step state
+  const [deletePromptStep, setDeletePromptStep] = useState<0 | 1 | 2>(0);
 
   // Simulated metrics to trigger Partnership Modal!
   const [subsCount, setSubsCount] = useState(720); // starts close to 777
@@ -282,16 +287,41 @@ export default function Profile({ profile, onUpdate }: ProfileProps) {
           </div>
         </div>
 
-        {/* Live partner goal email trigger */}
-        {isPartnerApproved && (
-          <button
-            onClick={() => setShowPartnerEmail(true)}
-            className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow cursor-pointer transition animate-bounce py-2"
-            id="claim-partnership-reward"
-          >
-            📬 Opened congrats partner email!
-          </button>
-        )}
+        {/* Actions section */}
+        <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+          {onLogOut && (
+            <button
+              type="button"
+              onClick={onLogOut}
+              className="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/60 font-black text-xs px-3.5 py-1.5 rounded-xl shadow cursor-pointer transition select-none flex items-center gap-1"
+              id="profile-logout-btn"
+            >
+              Sign Out 🚪
+            </button>
+          )}
+
+          {onDeleteAccount && (
+            <button
+              type="button"
+              onClick={() => setDeletePromptStep(1)}
+              className="bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/60 font-black text-xs px-3.5 py-1.5 rounded-xl shadow cursor-pointer transition select-none flex items-center gap-1"
+              id="profile-delete-btn"
+            >
+              Delete Account 🗑️
+            </button>
+          )}
+
+          {isPartnerApproved && (
+            <button
+              type="button"
+              onClick={() => setShowPartnerEmail(true)}
+              className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow cursor-pointer transition animate-bounce py-2"
+              id="claim-partnership-reward"
+            >
+              📬 Opened congrats partner email!
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Dashboard sections Grid */}
@@ -578,6 +608,89 @@ export default function Profile({ profile, onUpdate }: ProfileProps) {
                   <span>Subscribe to @UsagyuunVtuber</span>
                   <ExternalLink className="w-3.5 h-3.5 text-white" />
                 </a>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* STEP 1: ARE YOU SURE? DELETE POPUP */}
+        {deletePromptStep === 1 && (
+          <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm" id="delete-prompt-step1-container">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="max-w-md w-full bg-[#121214] border border-red-500/35 p-6 rounded-3xl shadow-2xl relative space-y-4"
+            >
+              <div className="text-center pb-2 border-b border-white/5 flex items-center justify-center gap-2">
+                <span className="text-3xl text-rose-500 animate-pulse">⚠️</span>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Are you sure? - Step 1 of 2</h3>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed text-center">
+                Are you absolutely sure you want to permanently delete your Midyeah streamer account? 
+                This will wipe out your local profile documents, global credentials, and active subscriber history permanently.
+              </p>
+              <div className="flex gap-3 justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeletePromptStep(2)}
+                  className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs p-2.5 px-5 rounded-xl cursor-pointer shadow transition"
+                  id="delete-step1-yes-btn"
+                >
+                  Yes, I am sure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletePromptStep(0)}
+                  className="bg-[#1C1C1F] hover:bg-[#2A2A2F] border border-white/10 text-gray-300 font-extrabold text-xs p-2.5 px-5 rounded-xl cursor-pointer transition"
+                  id="delete-step1-cancel-btn"
+                >
+                  No, Keep Account
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* STEP 2: CONFIRM DELETION PERMANENT PURGE POPUP */}
+        {deletePromptStep === 2 && (
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-sm" id="delete-prompt-step2-container">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="max-w-md w-full bg-[#0d0709] border-2 border-red-600 p-6 rounded-3xl shadow-2xl relative space-y-4 text-center"
+            >
+              <div className="pb-2 border-b border-white/5 flex flex-col items-center gap-1">
+                <span className="text-4xl text-red-600 animate-bounce">🛑</span>
+                <h3 className="text-sm font-black text-rose-500 uppercase tracking-widest leading-none">Confirm Deletion - Step 2 of 2</h3>
+              </div>
+              <p className="text-xs text-red-200 leading-relaxed font-semibold">
+                This action is 100% irreversible! All your streamer data, active watch sessions, videos, and profile details will be completely destroyed from global database endpoints!
+              </p>
+              <p className="text-[10px] text-gray-400">
+                Tap <b>Confirm Deletion</b> below to apply final database purge and sign out.
+              </p>
+              <div className="flex gap-3 justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeletePromptStep(0);
+                    if (onDeleteAccount) onDeleteAccount();
+                  }}
+                  className="bg-[#FF0055] hover:bg-red-550 text-white font-black text-xs p-2.5 px-6 rounded-xl cursor-pointer shadow-xl shadow-red-950/40 transition uppercase tracking-wider animate-pulse"
+                  id="delete-step2-confirm-btn"
+                >
+                  Confirm Deletion 🗑️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletePromptStep(0)}
+                  className="bg-[#1C1C1F] hover:bg-[#2A2A2F] border border-white/10 text-gray-300 font-extrabold text-xs p-2.5 px-6 rounded-xl cursor-pointer transition uppercase tracking-wider"
+                  id="delete-step2-cancel-btn"
+                >
+                  Cancel & Save
+                </button>
               </div>
             </motion.div>
           </div>

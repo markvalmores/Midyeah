@@ -67,6 +67,49 @@
         "likes": { "type": "integer", "description": "Consolidated comment approval counter" }
       },
       "required": ["id", "videoId", "username", "text", "timestamp"]
+    },
+    "DiscordMessage": {
+      "title": "DiscordMessage",
+      "description": "Global community chat message details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique globally available message ID" },
+        "username": { "type": "string", "description": "Sender username" },
+        "avatarUrl": { "type": "string", "description": "Sender avatar visual link" },
+        "text": { "type": "string", "description": "Message chat string content" },
+        "timestamp": { "type": "string", "description": "ISO calendar snapshot" }
+      },
+      "required": ["id", "username", "text", "timestamp"]
+    },
+    "Playlist": {
+      "title": "Playlist",
+      "description": "Custom curated video collections for viewers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique playlist identifier ID" },
+        "name": { "type": "string", "description": "Curator assigned title text" },
+        "ownerEmail": { "type": "string", "description": "Email address of the owner" },
+        "videoIds": {
+          "type": "array",
+          "description": "Sequential array collection of included video identifier hashes"
+        },
+        "createdAt": { "type": "string", "description": "Creation timestamp entry tracking" }
+      },
+      "required": ["id", "name", "ownerEmail", "videoIds", "createdAt"]
+    },
+    "DonationRecord": {
+      "title": "DonationRecord",
+      "description": "A record of voluntary donation support contributed by users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique donation hash ID" },
+        "donorName": { "type": "string", "description": "Voluntary profile donor alias" },
+        "amount": { "type": "number", "description": "Donated value in USD" },
+        "message": { "type": "string", "description": "Cheering message text description" },
+        "target": { "type": "string", "description": "Target of support: owner, charity, church, or people" },
+        "timestamp": { "type": "string", "description": "ISO calendar snapshot" }
+      },
+      "required": ["id", "donorName", "amount", "message", "target", "timestamp"]
     }
   },
   "firestore": {
@@ -85,6 +128,18 @@
     "/global_videos/{videoId}/comments/{commentId}": {
       "schema": "Comment",
       "description": "Subcollection housing social comments for specific upload entities"
+    },
+    "/discord_messages/{messageId}": {
+      "schema": "DiscordMessage",
+      "description": "Global community real-time discord chat workspace"
+    },
+    "/playlists/{playlistId}": {
+      "schema": "Playlist",
+      "description": "Subscriber dynamic curated video playlists"
+    },
+    "/donations/{donationId}": {
+      "schema": "DonationRecord",
+      "description": "Donations contributed toward owners, charities, churches, and needy people"
     }
   }
 }

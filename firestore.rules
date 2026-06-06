@@ -49,6 +49,27 @@ service cloud.firestore {
           && data.text is string && data.text.size() <= 10000;
     }
 
+    function isValidDiscordMessage(data) {
+      return data.id is string
+          && data.username is string && data.username.size() <= 100
+          && data.text is string && data.text.size() <= 10000;
+    }
+
+    function isValidPlaylist(data) {
+      return data.id is string
+          && data.name is string && data.name.size() <= 100
+          && data.ownerEmail is string && data.ownerEmail.size() <= 100
+          && data.videoIds is list && data.videoIds.size() <= 500;
+    }
+
+    function isValidDonation(data) {
+      return data.id is string
+          && data.donorName is string && data.donorName.size() <= 100
+          && data.amount is number
+          && data.message is string && data.message.size() <= 10000
+          && data.target is string && data.target.size() <= 100;
+    }
+
     // 2. User Profiles mapping
     match /profiles/{email} {
       allow read: if isSignedIn();
@@ -87,6 +108,33 @@ service cloud.firestore {
         allow update, delete: if isSignedIn() && isValidId(commentId)
                               && (resource.data.username == request.auth.token.name || get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email);
       }
+    }
+
+    // 4. Discord Community Messages
+    match /discord_messages/{messageId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(messageId) && isValidDiscordMessage(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // 5. Saved Custom Curator Playlists
+    match /playlists/{playlistId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(playlistId) 
+                    && request.resource.data.ownerEmail == request.auth.token.email
+                    && isValidPlaylist(request.resource.data);
+      allow update: if isSignedIn() && isValidId(playlistId)
+                    && resource.data.ownerEmail == request.auth.token.email
+                    && request.resource.data.ownerEmail == request.auth.token.email
+                    && isValidPlaylist(request.resource.data);
+      allow delete: if isSignedIn() && isValidId(playlistId) && resource.data.ownerEmail == request.auth.token.email;
+    }
+
+    // 6. Transparent Donation Audit & Ledger Records
+    match /donations/{donationId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(donationId) && isValidDonation(request.resource.data);
+      allow update, delete: if false;
     }
 
   }

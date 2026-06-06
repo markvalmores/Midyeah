@@ -4,19 +4,34 @@
  */
 
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { 
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword 
+} from "firebase/auth";
 import { 
   getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
   query, orderBy, getDocFromServer, collectionGroup
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
-import { Video, UserProfile, Comment, DiscordMessage } from "./types";
+import { Video, UserProfile, Comment, DiscordMessage, Playlist, DonationRecord, DonationStats } from "./types";
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+export async function authenticateUser(email: string, pass: string): Promise<void> {
+  try {
+    await createUserWithEmailAndPassword(auth, email, pass);
+  } catch (error: any) {
+    if (error.code === "auth/email-already-in-use") {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } else {
+      throw error;
+    }
+  }
+}
 
 // Standard Operational Error Handling Interface
 export enum OperationType {
@@ -80,7 +95,7 @@ validateConnection();
 
 // IndexedDB fallbacks for high-fidelity offline downloads
 const DB_NAME = "MidyeahDB";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 export async function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -115,6 +130,16 @@ export async function openDB(): Promise<IDBDatabase> {
       // Store play history offsets (to resume watching later)
       if (!db.objectStoreNames.contains("history")) {
         db.createObjectStore("history", { keyPath: "videoId" });
+      }
+
+      // Store user playlists
+      if (!db.objectStoreNames.contains("playlists")) {
+        db.createObjectStore("playlists", { keyPath: "id" });
+      }
+
+      // Store transparent donation audit records
+      if (!db.objectStoreNames.contains("donations")) {
+        db.createObjectStore("donations", { keyPath: "id" });
       }
     };
   });
@@ -194,6 +219,100 @@ export async function downloadGlobalVideoChunks(videoId: string): Promise<Blob> 
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, `global_videos/${videoId}/chunks`);
     throw err;
+  }
+}
+
+// PREMIUM HIGH-RESOLUTION ANIME ILLUSTRATION FALLBACKS
+const PREMIUM_ANIME_FALLBACKS = [
+  "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1560942485-b2a11cc13456?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1614036417651-efe5912149d8?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1617791160505-6f006e121980?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1627672360099-0e3125c150fc?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&w=250&q=80",
+  "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=250&q=80"
+];
+
+/**
+ * Fetch a random beautiful anime avatar from several top anime image endpoints recursively,
+ * and fall back to custom premium illustrations or SVG seed layouts in case of rate limit or CORS.
+ */
+export async function getAnyAnimeAvatarUrl(): Promise<string> {
+  const apis = [
+    async () => {
+      const res = await fetch("https://nekos.best/api/v2/nekos?amount=1");
+      const data = await res.json();
+      if (data?.results?.[0]?.url) return data.results[0].url;
+      throw new Error("No url in nekos.best");
+    },
+    async () => {
+      const res = await fetch("https://api.waifu.pics/sfw/waifu");
+      const data = await res.json();
+      if (data?.url) return data.url;
+      throw new Error("No url in waifu.pics");
+    },
+    async () => {
+      const res = await fetch("https://api.catboys.com/img");
+      const data = await res.json();
+      if (data?.url) return data.url;
+      throw new Error("No url in catboys");
+    }
+  ];
+
+  // Randomize endpoint order to balance API loads
+  const shuffledApis = [...apis].sort(() => Math.random() - 0.5);
+  for (const apiCall of shuffledApis) {
+    try {
+      const url = await apiCall();
+      if (url) return url;
+    } catch (e) {
+      console.warn("One anime api fetch failed, selecting other...", e);
+    }
+  }
+
+  // Double backup in case of connectivity errors
+  const seed = Math.floor(Math.random() * 10000);
+  const fallbacks = [
+    `https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}`,
+    `https://robohash.org/${seed}?set=set5`,
+    PREMIUM_ANIME_FALLBACKS[Math.floor(Math.random() * PREMIUM_ANIME_FALLBACKS.length)]
+  ];
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+}
+
+/**
+ * Permanently delete a User's account details from both high-speed Local IndexedDB
+ * and Firestore globally.
+ */
+export async function deleteProfileFromDb(email: string): Promise<void> {
+  // Wipe from IndexedDB
+  const localDb = await openDB();
+  const tx = localDb.transaction("profiles", "readwrite");
+  const store = tx.objectStore("profiles");
+  store.delete(email);
+
+  // Wipe from global Firestore profiles collection
+  try {
+    const docRef = doc(db, "profiles", email);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Firestore Profile Wipe failed:", err);
+  }
+
+  // Wipe account from Firebase Auth
+  const currentUser = auth.currentUser;
+  if (currentUser && currentUser.email === email) {
+    try {
+      await currentUser.delete();
+    } catch (err) {
+      console.warn("Auth user delete failed. Account is wiped from databases, signing out.", err);
+      await signOut(auth);
+    }
   }
 }
 
@@ -568,3 +687,226 @@ export async function getPlayOffset(videoId: string): Promise<number> {
     req.onerror = () => reject(req.error);
   });
 }
+
+// Custom Playlist Firestore and offline handlers
+export async function createPlaylist(name: string, ownerEmail: string): Promise<Playlist> {
+  const newPlaylist: Playlist = {
+    id: "pl_" + Math.random().toString(36).substring(2, 11),
+    name,
+    ownerEmail,
+    videoIds: [],
+    createdAt: new Date().toISOString()
+  };
+
+  // Local write
+  const localDb = await openDB();
+  const tx = localDb.transaction("playlists", "readwrite");
+  tx.objectStore("playlists").put(newPlaylist);
+
+  // Global write
+  try {
+    const docRef = doc(db, "playlists", newPlaylist.id);
+    await setDoc(docRef, newPlaylist);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `playlists/${newPlaylist.id}`);
+  }
+
+  return newPlaylist;
+}
+
+export async function getPlaylistsByOwner(ownerEmail: string): Promise<Playlist[]> {
+  const remotePlaylists: Playlist[] = [];
+  try {
+    const collRef = collection(db, "playlists");
+    const snap = await getDocs(collRef);
+    snap.forEach(docSnap => {
+      const data = docSnap.data() as Playlist;
+      if (data.ownerEmail === ownerEmail) {
+        remotePlaylists.push(data);
+      }
+    });
+  } catch (err) {
+    console.warn("Failed fetching remote playlists, using local:", err);
+  }
+
+  // Local fallback
+  const localDb = await openDB();
+  const localPlaylists: Playlist[] = await new Promise((resolve, reject) => {
+    const tx = localDb.transaction("playlists", "readonly");
+    const req = tx.objectStore("playlists").getAll();
+    req.onsuccess = () => {
+      const all: Playlist[] = req.result || [];
+      resolve(all.filter(p => p.ownerEmail === ownerEmail));
+    };
+    req.onerror = () => reject(req.error);
+  });
+
+  // Sync / merge
+  const merged = new Map<string, Playlist>();
+  remotePlaylists.forEach(p => merged.set(p.id, p));
+  localPlaylists.forEach(p => {
+    if (!merged.has(p.id)) {
+      merged.set(p.id, p);
+    }
+  });
+
+  return Array.from(merged.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function updatePlaylist(playlist: Playlist): Promise<void> {
+  // Local write
+  const localDb = await openDB();
+  const tx = localDb.transaction("playlists", "readwrite");
+  tx.objectStore("playlists").put(playlist);
+
+  // Global write
+  try {
+    const docRef = doc(db, "playlists", playlist.id);
+    await setDoc(docRef, playlist);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `playlists/${playlist.id}`);
+  }
+}
+
+export async function deletePlaylist(id: string): Promise<void> {
+  // Local delete
+  const localDb = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = localDb.transaction("playlists", "readwrite");
+    tx.objectStore("playlists").delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+
+  // Remote delete
+  try {
+    await deleteDoc(doc(db, "playlists", id));
+  } catch (err) {
+    console.error("Could not delete playlist from remote network:", err);
+  }
+}
+
+// Transparent Volunteer Donation Seed and live handlers
+const SEED_DONATIONS: DonationRecord[] = [
+  {
+    id: "don_seed_1",
+    donorName: "Mico-chan 🌸",
+    amount: 150.00,
+    message: "Thank you for the amazing streaming station! Sending part of this to the Hope Charity Drive! Support the community! 💖",
+    target: "charity",
+    timestamp: "2026-05-15T12:00:00.000Z"
+  },
+  {
+    id: "don_seed_2",
+    donorName: "Keisuke VT",
+    amount: 250.00,
+    message: "A tiny seed for St. Michael Parish Church rebuilding fund. Blessings to everyone sharing their talents!",
+    target: "church",
+    timestamp: "2026-05-20T04:20:00.000Z"
+  },
+  {
+    id: "don_seed_3",
+    donorName: "Anonymous Cozy Friend",
+    amount: 80.00,
+    message: "To keep the cozy theater servers running smoothly! Love what you do for local families in need.",
+    target: "people",
+    timestamp: "2026-05-28T18:15:00.000Z"
+  },
+  {
+    id: "don_seed_4",
+    donorName: "Nyan-Power!",
+    amount: 120.00,
+    message: "Awesome stream, please buy yourself some milktea and treat the team! 🍦Support Vtuber usagyuunvtuber!",
+    target: "owner",
+    timestamp: "2026-06-02T09:30:00.000Z"
+  }
+];
+
+export async function createDonationRecord(
+  donorName: string, 
+  amount: number, 
+  message: string, 
+  target: "owner" | "charity" | "church" | "people"
+): Promise<DonationRecord> {
+  const newDonation: DonationRecord = {
+    id: "don_" + Math.random().toString(36).substring(2, 11),
+    donorName: donorName.trim() || "Anonymous Friend",
+    amount: Number(amount) || 10,
+    message: message.trim() || "Supporting our cozy community watchtower!",
+    target,
+    timestamp: new Date().toISOString()
+  };
+
+  // Local write
+  const localDb = await openDB();
+  const tx = localDb.transaction("donations", "readwrite");
+  tx.objectStore("donations").put(newDonation);
+
+  // Global write
+  try {
+    const docRef = doc(db, "donations", newDonation.id);
+    await setDoc(docRef, newDonation);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `donations/${newDonation.id}`);
+  }
+
+  return newDonation;
+}
+
+export async function getAllDonations(): Promise<DonationRecord[]> {
+  const remoteDonations: DonationRecord[] = [];
+  try {
+    const collRef = collection(db, "donations");
+    const snap = await getDocs(collRef);
+    snap.forEach(docSnap => {
+      remoteDonations.push(docSnap.data() as DonationRecord);
+    });
+  } catch (err) {
+    console.warn("Failed fetching remote donations:", err);
+  }
+
+  // Local fallback
+  const localDb = await openDB();
+  const localDonations: DonationRecord[] = await new Promise((resolve, reject) => {
+    const tx = localDb.transaction("donations", "readonly");
+    const req = tx.objectStore("donations").getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+
+  // Sync / merge
+  const merged = new Map<string, DonationRecord>();
+  
+  // Set default initial seeds
+  SEED_DONATIONS.forEach(d => merged.set(d.id, d));
+  
+  // Overlay remote and local writes
+  remoteDonations.forEach(d => merged.set(d.id, d));
+  localDonations.forEach(d => merged.set(d.id, d));
+
+  return Array.from(merged.values()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+export function computeDonationStats(donations: DonationRecord[]): DonationStats {
+  const stats: DonationStats = {
+    totalAmountRaised: 0,
+    totalDonationCount: donations.length,
+    targetDistribution: {
+      owner: 0,
+      charity: 0,
+      church: 0,
+      people: 0
+    }
+  };
+
+  donations.forEach(d => {
+    stats.totalAmountRaised += d.amount;
+    if (d.target in stats.targetDistribution) {
+      stats.targetDistribution[d.target] += d.amount;
+    }
+  });
+
+  return stats;
+}
+
+
