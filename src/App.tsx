@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import {
   Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
-  Trash2, Check, X, FolderHeart, FolderPlus, Gift
+  Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -29,9 +29,10 @@ import Profile from "./components/Profile";
 import DiscordChat from "./components/DiscordChat";
 import PlaylistsTab from "./components/PlaylistsTab";
 import SupportTab from "./components/SupportTab";
+import SearchTab from "./components/SearchTab";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search">("home");
   const [isCreatorMode, setIsCreatorMode] = useState(false); // Switch between Watcher and Creator mode
   const [offlineMode, setOfflineMode] = useState(false); // Offline-Viewing only downloaded videos
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
@@ -117,6 +118,7 @@ export default function App() {
         setIsStreaming(false);
       }
     }
+    setActiveTab("home");
     window.scrollTo({ top: 120, behavior: "smooth" });
   };
 
@@ -167,9 +169,93 @@ export default function App() {
   const [uploadCategory, setUploadCategory] = useState<"normal" | "movie" | "rental">("normal");
   const [uploadRentalPrice, setUploadRentalPrice] = useState(3);
   const [uploadRentalPeriod, setUploadRentalPeriod] = useState("month");
+  const [uploadCountry, setUploadCountry] = useState("philippines");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadStage, setUploadStage] = useState<string>("");
+
+  // Thumbnail options
+  const [uploadThumbnailMode, setUploadThumbnailMode] = useState<"auto" | "custom">("auto");
+  const [customThumbnailFile, setCustomThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string>("");
+  const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState<boolean>(false);
+
+  // Auto-generate thumbnail when a video is loaded and mode is 'auto'
+  useEffect(() => {
+    if (!uploadFile) {
+      setThumbnailPreviewUrl("");
+      return;
+    }
+
+    if (uploadThumbnailMode === "auto") {
+      setIsGeneratingThumbnail(true);
+      
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.muted = true;
+      video.playsInline = true;
+      const objectUrl = URL.createObjectURL(uploadFile);
+      video.src = objectUrl;
+
+      const handleCapture = () => {
+        // Seek to 1.5 seconds, or half of dynamic duration
+        const seekTime = Math.min(1.5, video.duration / 2 || 0.5);
+        video.currentTime = seekTime;
+      };
+
+      const handleSeeked = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const width = 640;
+          const height = video.videoWidth ? Math.round(width * (video.videoHeight / video.videoWidth)) : 360;
+          canvas.width = width;
+          canvas.height = height || 360;
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            setThumbnailPreviewUrl(dataUrl);
+          }
+        } catch (err) {
+          console.warn("Failed to generate offscreen video snapshot:", err);
+        } finally {
+          setIsGeneratingThumbnail(false);
+          video.onseeked = null;
+          video.onloadedmetadata = null;
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
+
+      video.onloadedmetadata = handleCapture;
+      video.onseeked = handleSeeked;
+      video.onerror = () => {
+        setIsGeneratingThumbnail(false);
+        URL.revokeObjectURL(objectUrl);
+      };
+    }
+  }, [uploadFile, uploadThumbnailMode]);
+
+  const handleCustomThumbnailChange = (file: File | null) => {
+    setCustomThumbnailFile(file);
+    if (!file) {
+      if (uploadFile) {
+        // Retrigger some auto capture or empty
+        setUploadThumbnailMode("auto");
+      } else {
+        setThumbnailPreviewUrl("");
+      }
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        setThumbnailPreviewUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Hydrate initial database connection and load videos
   useEffect(() => {
@@ -372,7 +458,9 @@ export default function App() {
         dislikes: 0,
         reactions: { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
         duration: 120, // simulate duration value
-        blob: uploadFile // save actual file to IndexedDB!
+        blob: uploadFile, // save actual file to IndexedDB!
+        thumbnailUrl: thumbnailPreviewUrl || "",
+        country: uploadCountry
       };
 
       // Stage 3: Dynamic byte-stream compilation
@@ -398,7 +486,11 @@ export default function App() {
       setUploadDesc("");
       setUploadIs360(false);
       setUploadCategory("normal");
+      setUploadCountry("philippines");
       setUploadFile(null);
+      setUploadThumbnailMode("auto");
+      setCustomThumbnailFile(null);
+      setThumbnailPreviewUrl("");
       setUploadProgress(null);
       setUploadStage("");
 
@@ -530,6 +622,14 @@ export default function App() {
             >
               <VideoIcon className="w-4 h-4" />
               <span className="hidden md:inline">Videos</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab("search"); setCurrentVideo(null); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "search" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              id="nav-tab-search"
+            >
+              <Search className="w-4 h-4 text-purple-300" />
+              <span>Search Space 🍥</span>
             </button>
             <button
               onClick={() => { setActiveTab("rooms"); setCurrentVideo(null); }}
@@ -779,13 +879,105 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Video Thumbnail Options (Auto vs Custom) */}
+                      <div className="bg-[#1C1C1F]/40 border border-white/5 rounded-2xl p-4 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-200">Video Cover Thumbnail</h4>
+                            <p className="text-[10px] text-gray-400">Choose auto-generated screenshots or upload your custom design.</p>
+                          </div>
+                          
+                          {/* Toggle switches */}
+                          <div className="flex bg-black/60 rounded-xl p-1 border border-white/10 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setUploadThumbnailMode("auto")}
+                              className={`px-3 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                                uploadThumbnailMode === "auto"
+                                  ? "bg-purple-600/90 text-white shadow-md font-extrabold"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              ⚙️ Auto Snapshot
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setUploadThumbnailMode("custom")}
+                              className={`px-3 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                                uploadThumbnailMode === "custom"
+                                  ? "bg-purple-600/90 text-white shadow-md font-extrabold"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              🎨 Custom Image
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                          {/* Left: Input Selection details */}
+                          <div className="md:col-span-7 space-y-3">
+                            {uploadThumbnailMode === "auto" ? (
+                              <div className="p-3 bg-purple-950/20 border border-purple-500/10 rounded-xl space-y-2">
+                                <p className="text-[10px] text-purple-300 font-semibold leading-relaxed">
+                                  {uploadFile 
+                                    ? "✨ Midyeah will automatically scan and capture an optimal preview frame at 1.5s or halfway into the video stream." 
+                                    : "📥 Please select a video file above to generate the automatic preview snapshot."}
+                                </p>
+                                {isGeneratingThumbnail && (
+                                  <div className="flex items-center gap-2 text-purple-400 font-mono text-[9px] animate-pulse">
+                                    <span className="h-1.5 w-1.5 bg-purple-500 rounded-full inline-block animate-ping" />
+                                    Capturing video slice frames...
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <label className="block text-purple-300 font-bold uppercase text-[9px] tracking-wider">Upload Thumbnail Cover image</label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleCustomThumbnailChange(e.target.files ? e.target.files[0] : null)}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 cursor-pointer text-slate-300 text-[11px] focus:border-purple-500 transition"
+                                />
+                                <span className="text-[9px] text-gray-500 block leading-tight">Recommended ratio: 16:9 widescreen format (JPG, PNG, WebP)</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: Live Preview Panel */}
+                          <div className="md:col-span-5 flex flex-col items-center justify-center">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Live Cover Preview</span>
+                            <div className="aspect-video w-full max-w-[200px] bg-black border border-white/10 rounded-xl overflow-hidden relative flex items-center justify-center group shadow-inner">
+                              {thumbnailPreviewUrl ? (
+                                <img
+                                  src={thumbnailPreviewUrl}
+                                  alt="Live preview"
+                                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="text-center p-3 text-slate-600 flex flex-col items-center justify-center gap-1">
+                                  <span className="text-lg">🖼️</span>
+                                  <span className="text-[8px] font-mono font-bold leading-tight uppercase">No cover loaded</span>
+                                </div>
+                              )}
+                              
+                              <span className="absolute bottom-1 right-1 px-1 bg-black/80 text-[7px] text-gray-400 font-mono rounded select-none">
+                                PREVIEW
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-gray-300 font-semibold mb-1 uppercase text-[10px]">Video Category Type</label>
                           <select
                             value={uploadCategory}
                             onChange={(e) => setUploadCategory(e.target.value as any)}
-                            className="w-full bg-[#1e172a] border border-purple-900 /60 text-purple-300 rounded-xl p-2 outline-none"
+                            className="w-full bg-[#1e172a] border border-purple-900/60 text-purple-300 rounded-xl p-2 outline-none"
                             id="upload-vid-category"
                           >
                             <option value="normal">🎥 Standard Normal Upload</option>
@@ -794,7 +986,25 @@ export default function App() {
                           </select>
                         </div>
 
-                        {uploadCategory === "rental" && (
+                        <div>
+                          <label className="block text-gray-300 font-semibold mb-1 uppercase text-[10px]">Originated Location / Country</label>
+                          <select
+                            value={uploadCountry}
+                            onChange={(e) => setUploadCountry(e.target.value)}
+                            className="w-full bg-[#1e172a] border border-purple-900/60 text-purple-300 rounded-xl p-2 outline-none"
+                            id="upload-vid-country"
+                          >
+                            <option value="philippines">🇵🇭 Philippines</option>
+                            <option value="japan">🇯🇵 Japan</option>
+                            <option value="usa">🇺🇸 United States</option>
+                            <option value="uk">🇬🇧 United Kingdom</option>
+                            <option value="france">🇫🇷 France</option>
+                            <option value="germany">🇩🇪 Germany</option>
+                            <option value="australia">🇦🇺 Australia</option>
+                          </select>
+                        </div>
+
+                        {uploadCategory === "rental" ? (
                           <>
                             <div>
                               <label className="block text-gray-300 font-semibold mb-1 uppercase text-[10px]">RENT PRICE (Min 3$ or 150 Php)</label>
@@ -808,7 +1018,7 @@ export default function App() {
                                 id="upload-vid-rent-price"
                               />
                             </div>
-                            <div>
+                            <div className="sm:col-span-3">
                               <label className="block text-gray-300 font-semibold mb-1 uppercase text-[10px]">Rental Duration Period</label>
                               <select
                                 value={uploadRentalPeriod}
@@ -821,10 +1031,10 @@ export default function App() {
                               </select>
                             </div>
                           </>
-                        )}
+                        ) : null}
 
-                        <div className={uploadCategory !== "rental" ? "sm:col-span-2 text-left py-2" : "text-left py-2"}>
-                          <label className="flex items-center gap-1.5 font-semibold text-gray-300 cursor-pointer mt-3">
+                        <div className="sm:col-span-3 text-left py-1">
+                          <label className="flex items-center gap-1.5 font-semibold text-gray-300 cursor-pointer mt-1">
                             <input
                               type="checkbox"
                               checked={uploadIs360}
@@ -1160,7 +1370,19 @@ export default function App() {
                                     <span className="text-white text-xs pl-0.5">▶</span>
                                   </div>
                                 </div>
-                                <div className="w-full h-full bg-[#1C1C1F] border-b border-white/5"></div>
+                                {vid.thumbnailUrl ? (
+                                  <img 
+                                    src={vid.thumbnailUrl} 
+                                    alt={vid.title} 
+                                    className="w-full h-full object-cover border-b border-white/5 transition duration-500 group-hover:scale-105"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-[#1C1C1F] border-b border-white/5 flex flex-col items-center justify-center gap-1.5 text-purple-900 group-hover:text-purple-700 transition">
+                                    <VideoIcon className="w-6 h-6 animate-pulse" />
+                                    <span className="text-[8px] font-mono font-bold tracking-wider uppercase">Loading Stream</span>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Title description details */}
@@ -1267,6 +1489,14 @@ export default function App() {
                   )}
 
                   {activeTab === "rooms" && <WatchRoom />}
+
+                  {activeTab === "search" && (
+                    <SearchTab 
+                      videosList={videosList}
+                      onPlayVideo={handlePlayVideo}
+                      onSwitchTab={setActiveTab}
+                    />
+                  )}
 
                   {activeTab === "radio" && <RadioPlayer />}
 

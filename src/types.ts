@@ -49,6 +49,8 @@ export interface Video {
   duration: number; // in seconds
   isPinned?: boolean;
   isOffline?: boolean; // is cached offline
+  thumbnailUrl?: string; // custom or auto-captured screenshot jpeg base64
+  country?: string; // Country location tag: "philippines", "japan", "usa", "uk", etc.
 }
 
 export interface Comment {

@@ -396,6 +396,7 @@ export async function saveVideo(video: Video, videoBlob?: Blob): Promise<void> {
     dislikes: video.dislikes || 0,
     reactions: video.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
     duration: video.duration || 120,
+    thumbnailUrl: video.thumbnailUrl || "",
     hasVideoData: !!videoBlob || !!video.blob
   };
 
@@ -435,7 +436,8 @@ export async function getAllVideos(): Promise<Video[]> {
         likes: dv.likes || 0,
         dislikes: dv.dislikes || 0,
         reactions: dv.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
-        duration: dv.duration || 120
+        duration: dv.duration || 120,
+        thumbnailUrl: dv.thumbnailUrl || ""
       });
     });
   } catch (err) {

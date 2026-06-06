@@ -301,7 +301,17 @@ export default function PlaylistsTab({ currUser, videosList, onPlayVideo, onSwit
                           className="h-10 w-16 bg-black rounded-lg relative overflow-hidden flex items-center justify-center border border-white/5 group-hover:border-purple-500/20 transition cursor-pointer"
                         >
                           <Play className="opacity-0 group-hover:opacity-100 w-4 h-4 text-white hover:scale-110 transition absolute z-10 fill-white" />
-                          <div className="absolute inset-0 bg-black/40 group-hover:bg-purple-950/20 z-0 transition duration-300"></div>
+                          {vid.thumbnailUrl ? (
+                            <img 
+                              src={vid.thumbnailUrl} 
+                              alt="" 
+                              className="absolute inset-0 w-full h-full object-cover transition duration-300 group-hover:scale-105" 
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-purple-950/20" />
+                          )}
+                          <div className="absolute inset-0 bg-black/40 group-hover:bg-purple-950/20 z-[5] transition duration-300"></div>
                         </div>
 
                         <div className="truncate">
