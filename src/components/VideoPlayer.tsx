@@ -15,12 +15,13 @@ import { savePlayOffset, getPlayOffset, saveVideo } from "../db";
 
 interface VideoPlayerProps {
   video: Video;
-  onDownload: (v: Video) => void;
+  onDownload: (v: Video, res: string) => void;
+  onSaveToLibrary: (v: Video) => void;
   isDownloaded: boolean;
   onVideoEnd?: () => void;
 }
 
-export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEnd }: VideoPlayerProps) {
+export default function VideoPlayer({ video, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +39,7 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
   const [isExpanded, setIsExpanded] = useState(false); // Wide theatre mode
   const [showSubtitles, setShowSubtitles] = useState(false);
   const [isAiSubtitle, setIsAiSubtitle] = useState(false);
+  const [downloadResolution, setDownloadResolution] = useState("1080p");
   const [pipActive, setPipActive] = useState(false);
   const [crashState, setCrashState] = useState(false);
 
@@ -705,14 +707,38 @@ export default function VideoPlayer({ video, onDownload, isDownloaded, onVideoEn
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Resolution picker */}
+            <select
+              className="bg-purple-950/80 text-purple-300 text-[10px] font-bold p-1 rounded-lg border border-purple-900/60 cursor-pointer outline-none hover:bg-purple-900 transition"
+              onChange={(e) => setDownloadResolution(e.target.value)}
+              value={downloadResolution}
+            >
+              <option value="480p">480p</option>
+              <option value="720p">720p</option>
+              <option value="1080p">1080p</option>
+              <option value="1440p">1440p</option>
+              <option value="4K">4K</option>
+              <option value="8K">8K</option>
+            </select>
+            
             {/* Download cache button */}
             <button
-              onClick={() => onDownload(video)}
+              onClick={() => onDownload(video, downloadResolution)}
               className={`flex items-center gap-1 text-xs px-3 py-1 rounded-xl font-medium transition cursor-pointer ${isDownloaded ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800" : "bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-900/60"}`}
               id="download-offline-btn"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isDownloaded ? "Saved Offline" : "Offline Download"}</span>
+              <span>{isDownloaded ? "Saved Offline" : "Save to Device"}</span>
+            </button>
+            
+            {/* Save to Midyeah Library button */}
+            <button
+              onClick={() => onSaveToLibrary(video)}
+              className="flex items-center gap-1 text-xs px-3 py-1 rounded-xl font-medium bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-900/60 transition cursor-pointer"
+              id="save-to-midyeah-lib-btn"
+            >
+              <FolderHeart className="w-3.5 h-3.5" />
+              <span>Save to Midyeah Library</span>
             </button>
           </div>
         </div>

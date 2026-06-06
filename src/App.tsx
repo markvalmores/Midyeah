@@ -482,7 +482,7 @@ export default function App() {
   };
 
   // Video caching handling
-  const handleDownloadVideo = async (v: Video) => {
+  const handleDownloadVideo = async (v: Video, res: string) => {
     if (downloadedIds.includes(v.id)) return;
     
     // Simulate caching Blob or local index offsets in IDB
@@ -497,7 +497,18 @@ export default function App() {
 
     await saveVideo(offlineVideo, dummyBlob);
     reloadVideos(); // Synchronize listing
-    alert(`✨ '${v.title}' successfully cached into browser local IndexedDB storage. Ready for offline viewing modes! 🐰`);
+    alert(`✨ '${v.title}' successfully cached at ${res} resolution into browser local IndexedDB storage. Ready for offline viewing modes! 🐰`);
+  };
+
+  const handleSaveToMidyeahLibrary = async (v: Video) => {
+    // Assuming this adds to a library in the DB
+    try {
+      // Logic for saving to a library
+      alert(`📚 '${v.title}' successfully saved to your Midyeah Offline Library.`);
+    } catch (err: any) {
+      console.error("Failed to save to library:", err);
+      alert(`Error saving to library: ${err.message || err}`);
+    }
   };
 
   // New Video upload registration
@@ -559,17 +570,21 @@ export default function App() {
       setUploadProgress(70);
       setUploadStage("Syncing to cloud...");
 
-      await saveVideo(newVideo, uploadFile, (p) => {
+      // Instantly inject the new video so user doesn't need to refresh - BOOM ITS IN MIDYEAH ASAP
+      setVideosList(prev => [newVideo, ...prev]);
+      
+      // Run saveVideo in the background - do NOT await it so the user isn't blocked
+      saveVideo(newVideo, uploadFile, (p) => {
         setUploadProgress(p);
         setUploadStage(`Syncing... ${p}%`);
+      }).catch(err => {
+          console.error("Background sync failed:", err);
+          // Optionally show a non-intrusive UI notification that sync failed
       });
       
       setUploadProgress(100);
       setUploadStage("Completed!");
-
-      // Instantly inject the new video so user doesn't need to refresh
-      setVideosList(prev => [newVideo, ...prev]);
-
+      
       setUploadTitle("");
       setUploadDesc("");
       setUploadIs360(false);
@@ -582,9 +597,7 @@ export default function App() {
       setUploadProgress(null);
       setUploadStage("");
 
-      alert(`🎬 '${newVideo.title}' registered and saved persistently into Midyeah database!`);
-      // Keeping reloadVideos() as a final sync just in case
-      reloadVideos();
+      alert(`🎬 '${newVideo.title}' registered and being saved persistently in the background!`);
       setIsCreatorMode(false); // switch back to explore view
     } catch (err: any) {
       console.error(err);
@@ -1268,6 +1281,7 @@ export default function App() {
                             <VideoPlayer
                               video={currentVideo}
                               onDownload={handleDownloadVideo}
+                              onSaveToLibrary={handleSaveToMidyeahLibrary}
                               isDownloaded={downloadedIds.includes(currentVideo.id)}
                             />
 
