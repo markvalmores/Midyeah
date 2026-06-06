@@ -10,12 +10,13 @@ import {
   Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search, Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { getRandomAnimeAvatar } from "./utils";
 
 import { Video, UserProfile, Comment, Playlist } from "./types";
 import { 
   subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
-  getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist
+  getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount
 } from "./db";
 
 import Mascot from "./components/Mascot";
@@ -155,7 +156,7 @@ export default function App() {
       id: "comment_" + Date.now(),
       videoId: currentVideo.id,
       username: currUser.username || "Guest Watcher",
-      avatarUrl: currUser.avatarUrl || "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+      avatarUrl: currUser.avatarUrl || getRandomAnimeAvatar(currUser.username || "Guest"),
       text: commentInput,
       timestamp: new Date().toISOString(),
       likes: 0,
@@ -291,17 +292,20 @@ export default function App() {
         });
       } else {
         // Automatically set up a default guest profile if logged in but no session
-        const defaultGuest: UserProfile = {
-            username: "Guest",
-            email: "guest@midyeah.com",
-            channelName: "GUEST STATIONS",
-            channelUrl: "guest_ch",
-            bio: "Welcome to Midyeah!",
-            avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
-            coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-            subscribersCount: 0
-        };
-        setCurrUser(defaultGuest);
+        Promise.all([getAnyAnimeAvatarUrl(), getUserCount()]).then(([randomAvatar, count]) => {
+          const formattedIndex = count.toString().padStart(2, '0');
+          const defaultGuest: UserProfile = {
+              username: `midyeah_user_${formattedIndex}`,
+              email: "guest@midyeah.com",
+              channelName: `Midyeah Player ${formattedIndex}`,
+              channelUrl: "guest_ch",
+              bio: "Welcome to Midyeah!",
+              avatarUrl: randomAvatar,
+              coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+              subscribersCount: 0
+          };
+          setCurrUser(defaultGuest);
+        });
       }
     });
 
@@ -337,13 +341,15 @@ export default function App() {
             // Only generate a default profile if no local session exists, to prevent overwriting existing user data
             const savedEmail = localStorage.getItem("midyeah_active_session_email");
             if (!savedEmail) {
+              const [randomAvatar, count] = await Promise.all([getAnyAnimeAvatarUrl(), getUserCount()]);
+              const formattedIndex = count.toString().padStart(2, '0');
               const prof: UserProfile = {
-                username: firebaseUser.email.split("@")[0],
+                username: `midyeah_user_${formattedIndex}`,
                 email: firebaseUser.email,
-                channelName: firebaseUser.email.split("@")[0].toUpperCase() + " STATIONS",
+                channelName: `Midyeah Player ${formattedIndex}`,
                 channelUrl: firebaseUser.email.split("@")[0] + "_ch",
                 bio: "Thank you for watching on Midyeah, God bless everyone!",
-                avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+                avatarUrl: randomAvatar,
                 coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
                 subscribersCount: 0
               };
@@ -404,13 +410,15 @@ export default function App() {
       // Check if user exists, if not, generate default
       let profile = await getProfile(emailInput);
       if (!profile) {
+        const [randomAvatar, count] = await Promise.all([getAnyAnimeAvatarUrl(), getUserCount()]);
+        const formattedIndex = count.toString().padStart(2, '0');
         profile = {
-          username: emailInput.split("@")[0],
+          username: `midyeah_user_${formattedIndex}`,
           email: emailInput,
-          channelName: emailInput.split("@")[0].toUpperCase() + " STATIONS",
+          channelName: `Midyeah Player ${formattedIndex}`,
           channelUrl: emailInput.split("@")[0] + "_ch",
           bio: "Welcome to Midyeah!",
-          avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+          avatarUrl: randomAvatar,
           coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
           subscribersCount: 0
         };
@@ -431,13 +439,15 @@ export default function App() {
     try {
       let profile = await getProfile(guestEmail);
       if (!profile) {
+        const [randomAvatar, count] = await Promise.all([getAnyAnimeAvatarUrl(), getUserCount()]);
+        const formattedIndex = count.toString().padStart(2, '0');
         profile = {
-          username: "Guest",
+          username: `midyeah_user_${formattedIndex}`,
           email: guestEmail,
-          channelName: "GUEST STATIONS",
+          channelName: `Midyeah Player ${formattedIndex}`,
           channelUrl: "guest_ch",
           bio: "Welcome to Midyeah!",
-          avatarUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+          avatarUrl: randomAvatar,
           coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
           subscribersCount: 0
         };
@@ -471,10 +481,12 @@ export default function App() {
         }
 
         // Initialize layout profile
+        const count = await getUserCount();
+        const formattedIndex = count.toString().padStart(2, '0');
         const prof: UserProfile = {
-          username: emailInput.split("@")[0],
+          username: `midyeah_user_${formattedIndex}`,
           email: emailInput,
-          channelName: emailInput.split("@")[0].toUpperCase() + " STATIONS",
+          channelName: `Midyeah Player ${formattedIndex}`,
           channelUrl: emailInput.split("@")[0] + "_ch",
           bio: "Thank you for watching on Midyeah, God bless everyone!",
           avatarUrl: randomAnimeAvatar,

@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { Video, UserProfile, Comment, DiscordMessage, Playlist, DonationRecord, DonationStats } from "./types";
+import { getRandomAnimeAvatar } from "./utils";
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
@@ -359,6 +360,17 @@ let hasFirestoreQuota = true;
 // Add a simple in-memory cache to skip Firestore writes if the profile hasn't changed.
 let lastSavedProfile = new Map<string, string>(); // email -> JSON.stringify(profile)
 
+export async function getUserCount(): Promise<number> {
+  try {
+    const collRef = collection(db, "profiles");
+    const snap = await getDocs(collRef);
+    return snap.size;
+  } catch (err) {
+    console.warn("Could not fetch user count from remote, defaulting to 0:", err);
+    return 0;
+  }
+}
+
 // Profile Sync functions
 export async function saveProfile(profile: UserProfile): Promise<void> {
   // Save locally
@@ -464,7 +476,7 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
     channelName: video.creator.channelName || "",
     channelUrl: video.creator.channelUrl || "",
     bio: video.creator.bio || "",
-    avatarUrl: video.creator.avatarUrl || "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+    avatarUrl: video.creator.avatarUrl || getRandomAnimeAvatar(video.creator.username),
     coverUrl: video.creator.coverUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
     subscribersCount: video.creator.subscribersCount || 0
   };
@@ -725,7 +737,7 @@ export async function saveComment(comment: Comment): Promise<void> {
     id: comment.id,
     videoId: comment.videoId,
     username: comment.username,
-    avatarUrl: comment.avatarUrl || "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+    avatarUrl: comment.avatarUrl || getRandomAnimeAvatar(comment.username),
     text: comment.text,
     timestamp: comment.timestamp || new Date().toISOString(),
     likes: comment.likes || 0
@@ -795,7 +807,7 @@ export async function saveDiscordMessage(msg: DiscordMessage): Promise<void> {
   const cleanMsg = {
     id: msg.id,
     username: msg.username,
-    avatarUrl: msg.avatarUrl || "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=40&q=40",
+    avatarUrl: msg.avatarUrl || getRandomAnimeAvatar(msg.username),
     text: msg.text,
     timestamp: msg.timestamp || new Date().toISOString()
   };
