@@ -87,9 +87,11 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
   // Sync all user-specific status (Subscription, Group, Likes, Reactions)
   useEffect(() => {
+    let isMounted = true;
     async function syncAllStatus() {
       // Resolve persistent user or client guest identifier
-      const userIdentifier = currUser?.email || (() => {
+      const savedEmail = localStorage.getItem("midyeah_active_session_email");
+      const userIdentifier = currUser?.email || savedEmail || (() => {
         let localAnon = localStorage.getItem("midyeah_anon_user_id");
         if (!localAnon) {
           localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);
@@ -102,20 +104,21 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
         try {
           // Fetch like/dislike status
           const rating = await getLikeDislikeStatus(userIdentifier, video.id);
-          setHasRated(rating);
+          if (isMounted) setHasRated(rating);
 
           // Fetch video reactions
           const reactType = await getVideoReactionStatus(userIdentifier, video.id);
-          setCurrentReact(reactType);
+          if (isMounted) setCurrentReact(reactType);
 
           // If logged in, fetch creator-related status
-          if (currUser && video.creator) {
-            const subbed = await checkSubscriptionStatus(currUser.email, video.creator.email);
-            setIsSubscribed(subbed);
+          const effectiveEmail = currUser?.email || savedEmail;
+          if (effectiveEmail && video.creator) {
+            const subbed = await checkSubscriptionStatus(effectiveEmail, video.creator.email);
+            if (isMounted) setIsSubscribed(subbed);
             
             const groupId = video.creator.channelUrl || "midyeah_group";
-            const joined = await checkGroupStatus(currUser.email, groupId);
-            setIsGroupMember(joined);
+            const joined = await checkGroupStatus(effectiveEmail, groupId);
+            if (isMounted) setIsGroupMember(joined);
           }
         } catch (e) {
           console.warn("Status synchronization failed:", e);
@@ -124,6 +127,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     }
 
     syncAllStatus();
+    return () => { isMounted = false; };
   }, [currUser, video.id]);
 
   const [aiSubtitles, setAiSubtitles] = useState<VideoSub[]>([]);

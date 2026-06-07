@@ -9,7 +9,7 @@ import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword 
 } from "firebase/auth";
 import { 
-  getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
+  initializeFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
   query, orderBy, getDocFromServer, collectionGroup, onSnapshot,
   where, writeBatch, updateDoc, increment, runTransaction
 } from "firebase/firestore";
@@ -19,7 +19,12 @@ import { getRandomAnimeAvatar } from "./utils";
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+
+// CRITICAL: Using initializeFirestore with long-polling to bypass environment-specific connectivity blocks
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -103,7 +108,10 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  if (error instanceof Error && (error.message.includes("resource-exhausted") || (error as any).code === "resource-exhausted")) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorCode = (error as any).code;
+
+  if (errorMessage.includes("resource-exhausted") || errorCode === "resource-exhausted" || errorCode === "unavailable") {
     isSyncStabilized = false;
     setTimeout(() => { isSyncStabilized = true; }, 60000 * 5); // Auto-heal sync engine after 5 mins
   }
