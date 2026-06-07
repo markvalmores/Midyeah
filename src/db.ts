@@ -669,6 +669,12 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
   if (isGuestAccount(video.creator.email)) {
     throw new Error("Guest accounts are strictly prohibited from uploading or saving videos.");
   }
+  
+  if (video.title && video.title.toLowerCase().includes("test")) {
+     console.warn("Attempted to save a test video. Blocked.");
+     return; // Just swallow it, don't throw an error to break the UI unnecessarily
+  }
+
   // Save locally in IndexedDB first (completes instantly, <10ms, working and available 100% offline)
   const localDb = await openDB();
   await new Promise<void>((resolve, reject) => {

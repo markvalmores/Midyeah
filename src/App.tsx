@@ -161,16 +161,15 @@ export default function App() {
 
   // HARDCORE ERADICATOR: Specifically target persistent ghost or test videos
   useEffect(() => {
-    if (videosList.length > 0 && currUser?.email) {
+    if (videosList.length > 0) {
       // SUSPICIOUS_LOGIC: Target "Test", "Untitled", or ghost-prefixed videos
-      // Admin can eradicate ANY "Test" video. Regular users only THEIR own "Test" videos.
+      // We eradicate any "Test" video instantly and aggressively. 
       const toEliminate = videosList.filter(v => 
-        (isAdminAccount(currUser.email) || v.creatorEmail === currUser.email) && (
-          v.id === "vid17" ||
-          (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
-          v.id.includes("ghost") || 
-          v.id.includes("vid_placeholder")
-        )
+        v.id === "vid17" ||
+        (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
+        (v.title && v.title.toLowerCase().includes("test")) ||
+        v.id.includes("ghost") || 
+        v.id.includes("vid_placeholder")
       );
       
       if (toEliminate.length > 0) {
@@ -187,7 +186,7 @@ export default function App() {
         });
       }
     }
-  }, [videosList, currUser]);
+  }, [videosList]);
 
   const handleDeleteSingleVideo = async (id: string) => {
     try {
@@ -411,7 +410,9 @@ export default function App() {
          const sanitized = (items || []).filter(v => 
             v.id !== "vid17" && 
             !v.id.includes("ghost") &&
-            !v.id.includes("vid_placeholder")
+            !v.id.includes("vid_placeholder") &&
+            !(v.title?.toLowerCase()?.includes("test")) &&
+            !(v.title?.toLowerCase()?.includes("untitled presentation"))
          );
          
          setVideosList(sanitized);
