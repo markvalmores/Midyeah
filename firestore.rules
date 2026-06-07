@@ -37,7 +37,11 @@ service cloud.firestore {
           && data.videoUrl is string && data.videoUrl.size() <= 2048
           && data.category in ['normal', 'movie', 'rental']
           && data.duration is number
-          && data.creatorEmail is string;
+          && data.creatorEmail is string
+          && (data.likes == null || data.likes is int)
+          && (data.dislikes == null || data.dislikes is int)
+          && (data.views == null || data.views is int)
+          && (data.reactions == null || data.reactions is map);
     }
 
     function isValidVideoChunk(data) {

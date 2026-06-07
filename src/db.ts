@@ -11,7 +11,7 @@ import {
 import { 
   getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
   query, orderBy, getDocFromServer, collectionGroup, onSnapshot,
-  where, writeBatch, updateDoc, increment
+  where, writeBatch, updateDoc, increment, runTransaction
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { Video, UserProfile, Comment, DiscordMessage, Playlist, DonationRecord, DonationStats } from "./types";
@@ -284,6 +284,18 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
         setTimeout(() => { isSyncStabilized = true; }, 60000 * 5); // Auto-heal
     }
     console.warn("Incremental global video sync paused or deferred:", err);
+  }
+}
+
+export async function atomicIncrementVideoView(videoId: string): Promise<void> {
+  if (!isSyncStabilized) return;
+  try {
+    const docRef = doc(db, "global_videos", videoId);
+    await updateDoc(docRef, {
+      views: increment(1)
+    });
+  } catch (err) {
+    console.warn("View increment failed:", err);
   }
 }
 
@@ -1628,21 +1640,39 @@ export async function saveLikeDislikeStatus(
     throw new Error("Guest accounts cannot rate videos.");
   }
   const likeId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
-  const docRef = doc(db, "likes_dislikes", likeId);
-  const path = `likes_dislikes/${likeId}`;
+  const likeRef = doc(db, "likes_dislikes", likeId);
+  const videoRef = doc(db, "global_videos", videoId);
+
   try {
-    if (type === null) {
-      await deleteDoc(docRef);
-    } else {
-      await setDoc(docRef, {
-        userId,
-        videoId,
-        type,
-        timestamp: new Date().toISOString()
-      });
-    }
+    await runTransaction(db, async (transaction) => {
+      const likeSnap = await transaction.get(likeRef);
+      const oldType = likeSnap.exists() ? likeSnap.data().type : null;
+
+      if (oldType === type) return; // No change
+
+      const videoUpdate: any = {};
+      if (oldType === "like") videoUpdate.likes = increment(-1);
+      if (oldType === "dislike") videoUpdate.dislikes = increment(-1);
+      
+      if (type === "like") videoUpdate.likes = increment(1);
+      if (type === "dislike") videoUpdate.dislikes = increment(1);
+
+      // Perform updates
+      transaction.update(videoRef, videoUpdate);
+      
+      if (type === null) {
+        transaction.delete(likeRef);
+      } else {
+        transaction.set(likeRef, {
+          userId,
+          videoId,
+          type,
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
   } catch (error) {
-    handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, path);
+    handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, `likes_dislikes/${likeId}`);
   }
 }
 
@@ -1676,21 +1706,39 @@ export async function saveVideoReactionStatus(
     throw new Error("Guest accounts cannot react to videos.");
   }
   const reactId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
-  const docRef = doc(db, "video_reactions", reactId);
-  const path = `video_reactions/${reactId}`;
+  const reactRef = doc(db, "video_reactions", reactId);
+  const videoRef = doc(db, "global_videos", videoId);
+
   try {
-    if (type === null) {
-      await deleteDoc(docRef);
-    } else {
-      await setDoc(docRef, {
-        userId,
-        videoId,
-        type,
-        timestamp: new Date().toISOString()
-      });
-    }
+    await runTransaction(db, async (transaction) => {
+      const reactSnap = await transaction.get(reactRef);
+      const oldType = reactSnap.exists() ? reactSnap.data().type : null;
+
+      if (oldType === type) return;
+
+      const videoUpdate: any = {};
+      if (oldType) {
+        videoUpdate[`reactions.${oldType}`] = increment(-1);
+      }
+      if (type) {
+        videoUpdate[`reactions.${type}`] = increment(1);
+      }
+
+      transaction.update(videoRef, videoUpdate);
+
+      if (type === null) {
+        transaction.delete(reactRef);
+      } else {
+        transaction.set(reactRef, {
+          userId,
+          videoId,
+          type,
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
   } catch (error) {
-    handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, path);
+    handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, `video_reactions/${reactId}`);
   }
 }
 
