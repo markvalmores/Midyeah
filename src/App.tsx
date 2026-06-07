@@ -17,7 +17,7 @@ import {
   subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
   getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount,
-  subscribeVideoComments, getProfileByUsername, isGuestAccount
+  subscribeVideoComments, getProfileByUsername, isGuestAccount, isAdminAccount
 } from "./db";
 
 import Mascot from "./components/Mascot";
@@ -67,7 +67,20 @@ export default function App() {
   };
 
   // Keep track of current user to prevent overwrites
+  const [isAdminVerified, setIsAdminVerified] = useState(false); // Verification for owner email access
   const currUserRef = useRef(currUser);
+
+  const checkAdminAccess = (email: string): boolean => {
+    if (isAdminAccount(email) && !isAdminVerified) {
+      const accessCode = prompt(`[Admin Access Req] Enter security code for ${email}:`);
+      if (accessCode === "121997") {
+        setIsAdminVerified(true);
+        return true;
+      }
+      return false;
+    }
+    return true;
+  };
   useEffect(() => {
     currUserRef.current = currUser;
   }, [currUser]);
@@ -400,6 +413,14 @@ export default function App() {
       if (savedEmail) {
         getProfile(savedEmail).then((profile) => {
           if (profile) {
+            if (isAdminAccount(profile.email) && !isAdminVerified) {
+              const accessCode = prompt(`[Session Unlocked] Enter code for ${profile.email}:`);
+              if (accessCode !== "121997") {
+                handleLogOut();
+                return;
+              }
+              setIsAdminVerified(true);
+            }
             setCurrUser(profile);
             // Do not automatically set stepAuth here
             reloadPlaylists(profile.email);
@@ -450,6 +471,14 @@ export default function App() {
         try {
           const profile = await getProfile(firebaseUser.email);
           if (profile) {
+            if (isAdminAccount(profile.email) && !isAdminVerified) {
+              const accessCode = prompt(`[Admin Verified] Final verification for ${profile.email}:`);
+              if (accessCode !== "121997") {
+                handleLogOut();
+                return;
+              }
+              setIsAdminVerified(true);
+            }
             localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
             setCurrUser(profile);
             // Do not automatically set stepAuth here
@@ -523,6 +552,12 @@ export default function App() {
     e.preventDefault();
     if (!emailInput.trim()) return;
 
+    // ADMIN Protection: Check if admin email is used
+    if (!checkAdminAccess(emailInput)) {
+      alert("Access Denied: Administrative credentials not verified.");
+      return;
+    }
+
     try {
       // Authenticate in Firebase Auth so that all writes succeed seamlessly under their profile!
       try {
@@ -595,6 +630,13 @@ export default function App() {
 
   const verifyRegisteredCode = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ADMIN Protection: Check if admin email is used
+    if (!checkAdminAccess(emailInput)) {
+      alert("Access Denied: Administrative credentials not verified.");
+      return;
+    }
+
     if (verificationCode === authCodeSent) {
       setIsVerifying(true);
       setVerificationProgress(30);
@@ -896,6 +938,7 @@ export default function App() {
       setStepAuth("loggedOut");
       setActiveTab("home");
       setUserPlaylists([]);
+      setIsAdminVerified(false); // Security: Reset admin verification status
     } catch (err) {
       console.error("Sign out fail:", err);
     }
@@ -2069,7 +2112,7 @@ export default function App() {
                                       </div>
                                     )}
 
-                                    {(currUser?.email === vid.creatorEmail || currUser?.email === vid.creator?.email) && (
+                                    {(isAdminAccount(currUser?.email) || currUser?.email === vid.creatorEmail || currUser?.email === vid.creator?.email) && (
                                       <>
                                         {deletingVideoId !== vid.id ? (
                                           <button

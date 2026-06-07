@@ -24,10 +24,16 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
 const GUEST_EMAIL = "guest@midyeah.com";
+const ADMIN_EMAIL = "mdv4244@gmail.com";
 
 export function isGuestAccount(email?: string): boolean {
   const currentEmail = email || auth.currentUser?.email;
   return currentEmail === GUEST_EMAIL;
+}
+
+export function isAdminAccount(email?: string): boolean {
+  const currentEmail = email || auth.currentUser?.email;
+  return currentEmail === ADMIN_EMAIL;
 }
 
 export async function authenticateUser(email: string, pass: string): Promise<void> {

@@ -87,13 +87,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == "guest@midyeah.com";
     }
 
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == "mdv4244@gmail.com";
+    }
+
     // 2. User Profiles mapping
     match /profiles/{email} {
       allow read: if true;
       allow create: if isSignedIn() && isOwner(email) && isValidUserProfile(request.resource.data);
       allow update: if (isSignedIn() && isOwner(email) && isValidUserProfile(request.resource.data))
                     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscribersCount']));
-      allow delete: if isSignedIn() && isOwner(email);
+      allow delete: if isSignedIn() && (isOwner(email) || isAdmin());
     }
 
     // 3. Global Videos mapping
@@ -108,7 +112,7 @@ service cloud.firestore {
                       (isSignedIn() && !isGuest() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'dislikes', 'reactions']))
                     )
                     && isValidVideo(request.resource.data);
-      allow delete: if isSignedIn() && (resource.data.creatorEmail == request.auth.token.email && !isGuest());
+      allow delete: if isSignedIn() && (isAdmin() || (resource.data.creatorEmail == request.auth.token.email && !isGuest()));
 
       // Chunks subcollection
       match /chunks/{chunkId} {
@@ -118,7 +122,7 @@ service cloud.firestore {
                               && get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email
                               && isValidVideoChunk(request.resource.data);
         allow delete: if isSignedIn() && isValidId(chunkId)
-                      && get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email;
+                      && (isAdmin() || get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email);
       }
 
       // Comments subcollection
@@ -130,6 +134,7 @@ service cloud.firestore {
                       && (resource.data.username == request.auth.token.name || get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email);
         allow delete: if isSignedIn() && !isGuest() && isValidId(commentId)
                       && (
+                        isAdmin() ||
                         resource.data.username == request.auth.token.name || 
                         get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email
                       );
