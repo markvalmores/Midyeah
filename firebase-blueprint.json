@@ -110,6 +110,41 @@
         "timestamp": { "type": "string", "description": "ISO calendar snapshot" }
       },
       "required": ["id", "donorName", "amount", "message", "target", "timestamp"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "User subscription mappings for following creators",
+      "type": "object",
+      "properties": {
+        "followerEmail": { "type": "string", "description": "Follower email identifier" },
+        "followedEmail": { "type": "string", "description": "Followed creator email identifier" },
+        "timestamp": { "type": "string", "description": "Timestamp when matching took place" }
+      },
+      "required": ["followerEmail", "followedEmail", "timestamp"]
+    },
+    "LikeDislike": {
+      "title": "LikeDislike",
+      "description": "User persistent like or dislike choices on videos",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User email or hardware fingerprint identifier" },
+        "videoId": { "type": "string", "description": "Associated Video ID" },
+        "type": { "type": "string", "enum": ["like", "dislike"], "description": "Choice type" },
+        "timestamp": { "type": "string", "description": "ISO calendar snapshot" }
+      },
+      "required": ["userId", "videoId", "type", "timestamp"]
+    },
+    "VideoReaction": {
+      "title": "VideoReaction",
+      "description": "User persistent emoji reaction choices on videos",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User email or hardware fingerprint identifier" },
+        "videoId": { "type": "string", "description": "Associated Video ID" },
+        "type": { "type": "string", "description": "Emoji category selected" },
+        "timestamp": { "type": "string", "description": "ISO calendar snapshot" }
+      },
+      "required": ["userId", "videoId", "type", "timestamp"]
     }
   },
   "firestore": {
@@ -140,6 +175,18 @@
     "/donations/{donationId}": {
       "schema": "DonationRecord",
       "description": "Donations contributed toward owners, charities, churches, and needy people"
+    },
+    "/subscriptions/{subId}": {
+      "schema": "Subscription",
+      "description": "Mappings which describe subscriber counts dynamically"
+    },
+    "/likes_dislikes/{likeId}": {
+      "schema": "LikeDislike",
+      "description": "Persistent record keeping user specific standard likes and dislikes"
+    },
+    "/video_reactions/{reactId}": {
+      "schema": "VideoReaction",
+      "description": "Persistent record keeping user specific social reaction emojis"
     }
   }
 }

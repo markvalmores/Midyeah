@@ -1560,4 +1560,93 @@ export function computeDonationStats(donations: DonationRecord[]): DonationStats
   return stats;
 }
 
+// Persistent Likes/Dislikes Logic
+export async function saveLikeDislikeStatus(
+  userId: string,
+  videoId: string,
+  type: "like" | "dislike" | null
+): Promise<void> {
+  const likeId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  const docRef = doc(db, "likes_dislikes", likeId);
+  const path = `likes_dislikes/${likeId}`;
+  try {
+    if (type === null) {
+      await deleteDoc(docRef);
+    } else {
+      await setDoc(docRef, {
+        userId,
+        videoId,
+        type,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, path);
+  }
+}
+
+export async function getLikeDislikeStatus(
+  userId: string,
+  videoId: string
+): Promise<"like" | "dislike" | null> {
+  const likeId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  const docRef = doc(db, "likes_dislikes", likeId);
+  const path = `likes_dislikes/${likeId}`;
+  try {
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return data.type as "like" | "dislike";
+    }
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
+  }
+}
+
+// Persistent Video Reactions Logic
+export async function saveVideoReactionStatus(
+  userId: string,
+  videoId: string,
+  type: string | null
+): Promise<void> {
+  const reactId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  const docRef = doc(db, "video_reactions", reactId);
+  const path = `video_reactions/${reactId}`;
+  try {
+    if (type === null) {
+      await deleteDoc(docRef);
+    } else {
+      await setDoc(docRef, {
+        userId,
+        videoId,
+        type,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, path);
+  }
+}
+
+export async function getVideoReactionStatus(
+  userId: string,
+  videoId: string
+): Promise<string | null> {
+  const reactId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  const docRef = doc(db, "video_reactions", reactId);
+  const path = `video_reactions/${reactId}`;
+  try {
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data().type as string;
+    }
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
+  }
+}
+
 

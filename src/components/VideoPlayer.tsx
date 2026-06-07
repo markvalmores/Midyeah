@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Video, VideoSub, UserProfile } from "../types";
-import { savePlayOffset, getPlayOffset, saveVideo, toggleSubscription, checkSubscriptionStatus, toggleGroupMembership, checkGroupStatus } from "../db";
+import { savePlayOffset, getPlayOffset, saveVideo, toggleSubscription, checkSubscriptionStatus, toggleGroupMembership, checkGroupStatus, saveLikeDislikeStatus, getLikeDislikeStatus, saveVideoReactionStatus, getVideoReactionStatus } from "../db";
 
 interface VideoPlayerProps {
   video: Video;
@@ -96,6 +96,25 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     setIsPlaying(false);
     setCurrentReact(null);
     setHasRated(null);
+
+    // Resolve persistent user or client guest identifier
+    const userIdentifier = currUser?.email || (() => {
+      let localAnon = localStorage.getItem("midyeah_anon_user_id");
+      if (!localAnon) {
+        localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem("midyeah_anon_user_id", localAnon);
+      }
+      return localAnon;
+    })();
+
+    getLikeDislikeStatus(userIdentifier, video.id).then((status) => {
+      if (status) setHasRated(status);
+    });
+
+    getVideoReactionStatus(userIdentifier, video.id).then((reactType) => {
+      if (reactType) setCurrentReact(reactType);
+    });
+
     const newViews = (video.views || 0) + 1;
     setViewsCount(newViews); // bump views
     setReactCounts(video.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 });
@@ -145,7 +164,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
       });
     }
     setAiSubtitles(generatedSubs);
-  }, [video.id]);
+  }, [video.id, currUser]);
 
   // Handle play offset tracking every 3 seconds to defend against page crashes or tab close
   useEffect(() => {
@@ -350,10 +369,21 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   // React handling (Facebook reactions)
   const handleReaction = (reactType: string) => {
     let freshReacts = { ...reactCounts };
+    const userIdentifier = currUser?.email || (() => {
+      let localAnon = localStorage.getItem("midyeah_anon_user_id");
+      if (!localAnon) {
+        localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem("midyeah_anon_user_id", localAnon);
+      }
+      return localAnon;
+    })();
+
+    let nextRating: string | null = null;
     // toggle active react
     if (currentReact === reactType) {
       setCurrentReact(null);
       freshReacts[reactType as keyof typeof freshReacts] = Math.max(0, (freshReacts[reactType as keyof typeof freshReacts] || 0) - 1);
+      nextRating = null;
     } else {
       // remove old react if selected
       if (currentReact) {
@@ -361,6 +391,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
       }
       freshReacts[reactType as keyof typeof freshReacts] = (freshReacts[reactType as keyof typeof freshReacts] || 0) + 1;
       setCurrentReact(reactType);
+      nextRating = reactType;
     }
     setReactCounts(freshReacts);
 
@@ -369,12 +400,21 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
       reactions: freshReacts
     };
     saveVideo(updatedVideo).catch(err => console.warn("Failed to sync reaction:", err));
+    saveVideoReactionStatus(userIdentifier, video.id, nextRating).catch(err => console.warn("Failed to save reaction status:", err));
   };
 
   const handleLikeDislike = (type: "like" | "dislike") => {
     let newLikes = video.likes || 0;
     let newDislikes = video.dislikes || 0;
     let nextRated: "like" | "dislike" | null = null;
+    const userIdentifier = currUser?.email || (() => {
+      let localAnon = localStorage.getItem("midyeah_anon_user_id");
+      if (!localAnon) {
+        localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem("midyeah_anon_user_id", localAnon);
+      }
+      return localAnon;
+    })();
 
     if (hasRated === type) {
       nextRated = null;
@@ -405,6 +445,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
       dislikes: newDislikes
     };
     saveVideo(updatedVideo).catch(err => console.warn("Failed to sync rating:", err));
+    saveLikeDislikeStatus(userIdentifier, video.id, nextRated).catch(err => console.warn("Failed to save rating status:", err));
   };
 
   // Subtitle custom guess generator toggle

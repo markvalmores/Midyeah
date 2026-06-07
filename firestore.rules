@@ -70,6 +70,18 @@ service cloud.firestore {
           && data.target is string && data.target.size() <= 100;
     }
 
+    function isValidLikeDislike(data) {
+      return data.userId is string && data.userId.size() <= 128
+          && data.videoId is string && data.videoId.size() <= 128
+          && data.type in ['like', 'dislike'];
+    }
+
+    function isValidVideoReaction(data) {
+      return data.userId is string && data.userId.size() <= 128
+          && data.videoId is string && data.videoId.size() <= 128
+          && data.type is string && data.type.size() <= 100;
+    }
+
     // 2. User Profiles mapping
     match /profiles/{email} {
       allow read: if isSignedIn();
@@ -135,6 +147,26 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn() && isValidId(donationId) && isValidDonation(request.resource.data);
       allow update, delete: if false;
+    }
+
+    // 7. Subscriptions mappings
+    match /subscriptions/{subId} {
+      allow read: if true;
+      allow create, delete: if isSignedIn() && isValidId(subId);
+    }
+
+    // 8. Persistent Likes/Dislikes
+    match /likes_dislikes/{likeId} {
+      allow read: if true;
+      allow create, update: if isValidId(likeId) && isValidLikeDislike(request.resource.data);
+      allow delete: if isValidId(likeId);
+    }
+
+    // 9. Persistent Video Reactions
+    match /video_reactions/{reactId} {
+      allow read: if true;
+      allow create, update: if isValidId(reactId) && isValidVideoReaction(request.resource.data);
+      allow delete: if isValidId(reactId);
     }
 
   }
