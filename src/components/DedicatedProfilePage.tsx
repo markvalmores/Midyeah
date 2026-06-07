@@ -112,6 +112,15 @@ export default function DedicatedProfilePage({
         </button>
 
         <div className="flex items-center gap-2">
+          {onLogOut && (
+            <button
+              onClick={onLogOut}
+              className="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/60 font-black text-xs px-3.5 py-1.5 rounded-xl transition cursor-pointer"
+            >
+              Sign Out 🚪
+            </button>
+          )}
+
           {isOwnProfile && (
             <button
               onClick={() => setShowEditMode(!showEditMode)}

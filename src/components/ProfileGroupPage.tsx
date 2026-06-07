@@ -8,9 +8,10 @@ interface ProfileGroupPageProps {
   currUser: UserProfile | null;
   groupProfile: UserProfile;
   onBack: () => void;
+  onLogOut?: () => void;
 }
 
-export default function ProfileGroupPage({ currUser, groupProfile, onBack }: ProfileGroupPageProps) {
+export default function ProfileGroupPage({ currUser, groupProfile, onBack, onLogOut }: ProfileGroupPageProps) {
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -167,6 +168,14 @@ export default function ProfileGroupPage({ currUser, groupProfile, onBack }: Pro
           </div>
           
           <div className="flex items-center gap-2">
+            {onLogOut && (
+              <button 
+                onClick={onLogOut}
+                className="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/60 font-black text-[10px] px-3 py-1.5 rounded-xl transition cursor-pointer"
+              >
+                Sign Out 🚪
+              </button>
+            )}
             <label className="flex items-center gap-1.5 text-[10px] bg-purple-950/60 hover:bg-purple-900/80 px-3 py-1.5 rounded-xl cursor-pointer transition border border-purple-800/50">
               <ImageIcon className="w-3 h-3" />
               <span>Set BG</span>

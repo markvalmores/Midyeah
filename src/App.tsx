@@ -41,7 +41,13 @@ import { RentalPayment } from "./components/RentalPayment";
 import MembersPlusPage from "./components/MembersPlusPage";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus">(() => {
+    return (localStorage.getItem("midyeah_active_tab") as any) || "home";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("midyeah_active_tab", activeTab);
+  }, [activeTab]);
   const [isCreatorMode, setIsCreatorMode] = useState(false); // Switch between Watcher and Creator mode
   const [offlineMode, setOfflineMode] = useState(false); // Offline-Viewing only downloaded videos
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
@@ -126,10 +132,11 @@ export default function App() {
         
         if (trackerSnap.exists()) {
           const newData = {
+            userId: currUser.email,
             totalSeconds: trackerSnap.data().totalSeconds + 60,
             lastActive: new Date().toISOString()
           };
-          await updateDoc(trackerRef, newData);
+          await updateDoc(trackerRef, newData);                
           setUsageTracker(newData.totalSeconds);
         } else {
           const newData = {
@@ -2275,6 +2282,7 @@ export default function App() {
                       currUser={currUser} 
                       groupProfile={activeGroupProfile}
                       onBack={() => setActiveTab("home")}
+                      onLogOut={handleLogOut}
                     />
                   )}
 
