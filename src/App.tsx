@@ -154,7 +154,6 @@ export default function App() {
       // Admin can eradicate ANY "Test" video. Regular users only THEIR own "Test" videos.
       const toEliminate = videosList.filter(v => 
         (isAdminAccount(currUser.email) || v.creatorEmail === currUser.email) && (
-          v.title.toLowerCase().includes("test") ||
           v.id === "vid17" ||
           (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
           v.id.includes("ghost") || 
@@ -399,7 +398,6 @@ export default function App() {
          // GHOST SUPPRESSION LAYER: Instantly filter out known bugged IDs
          const sanitized = (items || []).filter(v => 
             v.id !== "vid17" && 
-            v.title.toLowerCase() !== "test" &&
             !v.id.includes("ghost") &&
             !v.id.includes("vid_placeholder")
          );
