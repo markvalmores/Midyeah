@@ -939,36 +939,34 @@ export async function deleteVideo(id: string): Promise<void> {
   }
 
   // Remote Firestore delete - Await this to ensure "hard-code delete" as requested
-  if (isSyncStabilized) {
-    try {
-      const docRef = doc(db, "global_videos", id);
-      await deleteDoc(docRef);
-      
-      // Also delete chunks to free up space and ensure permanent removal
-      const chunksColl = collection(db, "global_videos", id, "chunks");
-      const chunksSnap = await getDocs(chunksColl);
-      const batch = writeBatch(db);
-      chunksSnap.forEach(cDoc => {
-        batch.delete(cDoc.ref);
-      });
-      await batch.commit();
-      
-      // Delete comments associated with this video
-      const commentsColl = collection(db, "global_videos", id, "comments");
-      const commentsSnap = await getDocs(commentsColl);
-      const commBatch = writeBatch(db);
-      commentsSnap.forEach(cDoc => {
-        commBatch.delete(cDoc.ref);
-      });
-      await commBatch.commit();
+  try {
+    const docRef = doc(db, "global_videos", id);
+    await deleteDoc(docRef);
+    
+    // Also delete chunks to free up space and ensure permanent removal
+    const chunksColl = collection(db, "global_videos", id, "chunks");
+    const chunksSnap = await getDocs(chunksColl);
+    const batch = writeBatch(db);
+    chunksSnap.forEach(cDoc => {
+      batch.delete(cDoc.ref);
+    });
+    await batch.commit();
+    
+    // Delete comments associated with this video
+    const commentsColl = collection(db, "global_videos", id, "comments");
+    const commentsSnap = await getDocs(commentsColl);
+    const commBatch = writeBatch(db);
+    commentsSnap.forEach(cDoc => {
+      commBatch.delete(cDoc.ref);
+    });
+    await commBatch.commit();
 
-    } catch (err: any) {
-      if (err.message && (err.message.includes("resource-exhausted") || err.code === "resource-exhausted")) {
-        isSyncStabilized = false;
-      }
-      console.error("Could not delete from global network:", err);
-      // If quota hit, we don't throw here to allow local delete to finish silently
+  } catch (err: any) {
+    if (err.message && (err.message.includes("resource-exhausted") || err.code === "resource-exhausted")) {
+      isSyncStabilized = false;
+      setTimeout(() => { isSyncStabilized = true; }, 60000 * 5);
     }
+    console.error("Could not delete from global network:", err);
   }
 }
 
@@ -988,30 +986,29 @@ export async function clearAllVideos(): Promise<void> {
   });
 
   // Global clear (Hard-code delete all videos from Firestore as well)
-  if (isSyncStabilized) {
-    try {
-      const collRef = collection(db, "global_videos");
-      const snap = await getDocs(collRef);
-      const batch = writeBatch(db);
-      
-      let count = 0;
-      for (const d of snap.docs) {
-        batch.delete(d.ref);
-        count++;
-        if (count >= 400) {
-          await batch.commit();
-          break; // Stop at first batch for safety
-        }
-      }
-      if (count > 0 && count < 400) {
+  try {
+    const collRef = collection(db, "global_videos");
+    const snap = await getDocs(collRef);
+    const batch = writeBatch(db);
+    
+    let count = 0;
+    for (const d of snap.docs) {
+      batch.delete(d.ref);
+      count++;
+      if (count >= 400) {
         await batch.commit();
+        break; // Stop at first batch for safety
       }
-    } catch (err: any) {
-      if (err.message && err.message.includes("resource-exhausted")) {
-        isSyncStabilized = false;
-      }
-      console.error("Global Firestore clear failed:", err);
     }
+    if (count > 0 && count < 400) {
+      await batch.commit();
+    }
+  } catch (err: any) {
+    if (err.message && err.message.includes("resource-exhausted")) {
+      isSyncStabilized = false;
+      setTimeout(() => { isSyncStabilized = true; }, 60000 * 5);
+    }
+    console.error("Global Firestore clear failed:", err);
   }
 }
 

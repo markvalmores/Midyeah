@@ -134,6 +134,29 @@ export default function App() {
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
 
+  // HARDCORE ERADICATOR: Specifically target persistent ghost or test videos
+  useEffect(() => {
+    if (videosList.length > 0) {
+      // SUSPICIOUS_LOGIC: Target "Test", "Untitled", or ghost-prefixed videos
+      const toEliminate = videosList.filter(v => 
+        v.title.toLowerCase().includes("test video") ||
+        (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
+        v.id.includes("ghost") || 
+        v.id.includes("vid_placeholder")
+      );
+      
+      if (toEliminate.length > 0) {
+        console.log(`[Eradicator] Hard-killing ${toEliminate.length} persistent ghost videos...`);
+        toEliminate.forEach(v => {
+           deleteVideo(v.id).then(() => {
+              setVideosList(prev => prev.filter(item => item.id !== v.id));
+              console.log(`[Eradicator] Permanently purged: ${v.id} (${v.title})`);
+           }).catch(e => console.warn("Eradicator failure for video:", v.id, e));
+        });
+      }
+    }
+  }, [videosList]);
+
   const handleDeleteSingleVideo = async (id: string) => {
     try {
       await deleteVideo(id);
