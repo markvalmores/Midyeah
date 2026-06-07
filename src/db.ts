@@ -225,11 +225,14 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
       });
       
       if (onProgress) {
-        // Calculate progress from 0 to 100
-        const progress = Math.round(((i + 1) / numChunks) * 100);
-        onProgress(Math.min(progress, 100));
+        // Calculate progress carefully from 0 to 95
+        // We leave the last 5% for final metadata commit
+        const progress = Math.round(((i + 1) / numChunks) * 95);
+        onProgress(Math.min(progress, 95));
       }
     }
+    
+    // Final progress jump to 100% happens in the caller after final setDoc
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
         hasFirestoreQuota = false;
@@ -509,11 +512,14 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
       const docRef = doc(db, "global_videos", video.id);
       await setDoc(docRef, videoToSave);
       
-      // Delegate the heavy chunk transmission without awaiting, to keep UI hyper-responsive
       const blobToUpload = videoBlob || video.blob;
       if (blobToUpload) {
-        uploadVideoInChunks(video.id, blobToUpload, onProgress).catch(e => console.warn("Background chunk upload issue:", e));
+        // Await the heavy chunk transmission to ensure we reach 100% properly
+        await uploadVideoInChunks(video.id, blobToUpload, onProgress);
       }
+      
+      // Ensure we hit 100% after all chunks are confirmed
+      if (onProgress) onProgress(100);
     } catch (err: any) {
       if (err.message && err.message.includes("resource-exhausted")) {
         hasFirestoreQuota = false;
@@ -587,6 +593,17 @@ export function subscribeAllVideos(callback: (videos: Video[]) => void): () => v
         }
         mergedVideosMap.set(v.id, v);
       });
+
+      // SYNC CLEANUP: If a video was deleted from remote but exists in local cache, REMOVE it from local cache too.
+      // This kills "Ghost" videos that keep reappearing.
+      const remoteIds = new Set(remoteVideos.map(rv => rv.id));
+      for (const [localId, localVid] of cachedMap.entries()) {
+        if (!remoteIds.has(localId)) {
+          // It was deleted remotely, so we should delete it locally too
+          console.log(`Killing ghost video: ${localId}`);
+          deleteVideo(localId).catch(e => console.warn("Ghost kill failed:", e));
+        }
+      }
 
       cachedDbVideos.forEach(v => {
         if (!mergedVideosMap.has(v.id)) {

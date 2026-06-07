@@ -68,6 +68,22 @@ export default function App() {
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
 
+  // GHOST CLEANUP TRIGGER: Specifically target the "Good Morning" ghost or any invalid videos
+  useEffect(() => {
+    if (videosList.length > 0) {
+      const suspiciousIds = ["good_morning", "good-morning", "vid_ghost"]; // generic patterns for bugs
+      const toKill = videosList.filter(v => 
+        suspiciousIds.some(s => v.id.toLowerCase().includes(s)) || 
+        v.title.toLowerCase().includes("good morning")
+      );
+      
+      if (toKill.length > 0) {
+        console.log(`Eradicating ${toKill.length} ghost videos...`);
+        toKill.forEach(v => handleDeleteSingleVideo(v.id));
+      }
+    }
+  }, [videosList.length]);
+
   const handleDeleteSingleVideo = async (id: string) => {
     try {
       await deleteVideo(id);
@@ -635,6 +651,9 @@ export default function App() {
       
       setUploadProgress(100);
       setUploadStage("Completed!");
+      
+      // Show success notification bubble
+      alert("✨ Your post has been successful. God Bless.");
       
       // Delay reset so user sees 100% completion
       setTimeout(() => {

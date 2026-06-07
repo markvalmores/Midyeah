@@ -61,10 +61,30 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isGroupMember, setIsGroupMember] = useState(false);
 
-  // Subtitles generator (generates AI voice-over guess captions based on video criteria)
   const [aiSubtitles, setAiSubtitles] = useState<VideoSub[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<string>("");
   const [showSettings, setShowSettings] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const resetControlsTimeout = () => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    setControlsVisible(true);
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) {
+        setControlsVisible(false);
+      }
+    }, 4000);
+  };
+
+  useEffect(() => {
+    resetControlsTimeout();
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [isPlaying]);
 
   // Resume Watch persistence
   useEffect(() => {
@@ -444,7 +464,13 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   const likeRatio = hasRated === "like" ? 82 : hasRated === "dislike" ? 42 : 68;
 
   return (
-    <div className={`flex flex-col ${isExpanded ? "w-full" : "lg:col-span-2"} bg-[#121214] text-slate-100 rounded-2xl overflow-hidden shadow-2xl border border-white/10`} ref={containerRef}>
+    <div className={`flex flex-col ${isExpanded ? "w-full" : "lg:col-span-2"} bg-[#121214] text-slate-100 rounded-2xl overflow-hidden shadow-2xl border border-white/10`} ref={containerRef} 
+      onClick={() => {
+        resetControlsTimeout();
+        setShowSettings(false);
+      }}
+      onMouseMove={resetControlsTimeout}
+    >
       {/* Dynamic Player Screen Container */}
       <div className="relative group/player bg-black/90 aspect-video w-full flex items-center justify-center overflow-hidden">
         {crashState ? (
@@ -514,7 +540,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
         )}
 
         {/* Controls Overlay Panel */}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/50 to-transparent p-3 opacity-0 group-hover/player:opacity-100 transition-opacity flex flex-col gap-2 z-30 select-none">
+        <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/50 to-transparent p-3 transition-opacity duration-300 flex flex-col gap-2 z-30 select-none ${controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
           {/* Progress Slider */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-gray-300 font-mono">
