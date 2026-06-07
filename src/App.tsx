@@ -308,9 +308,9 @@ export default function App() {
           const defaultGuest: UserProfile = {
               username: `midyeah_user_${formattedIndex}`,
               email: "guest@midyeah.com",
-              channelName: `Midyeah Player ${formattedIndex}`,
+              channelName: `MidYeah Player ${formattedIndex}`,
               channelUrl: "guest_ch",
-              bio: "Welcome to Midyeah!",
+              bio: "Welcome to MidYeah!",
               avatarUrl: randomAvatar,
               coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
               subscribersCount: 0
@@ -357,9 +357,9 @@ export default function App() {
               const prof: UserProfile = {
                 username: `midyeah_user_${formattedIndex}`,
                 email: firebaseUser.email,
-                channelName: `Midyeah Player ${formattedIndex}`,
+                channelName: `MidYeah Player ${formattedIndex}`,
                 channelUrl: firebaseUser.email.split("@")[0] + "_ch",
-                bio: "Thank you for watching on Midyeah, God bless everyone!",
+                bio: "Thank you for watching on MidYeah, God bless everyone!",
                 avatarUrl: randomAvatar,
                 coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
                 subscribersCount: 0
@@ -426,9 +426,9 @@ export default function App() {
         profile = {
           username: `midyeah_user_${formattedIndex}`,
           email: emailInput,
-          channelName: `Midyeah Player ${formattedIndex}`,
+          channelName: `MidYeah Player ${formattedIndex}`,
           channelUrl: emailInput.split("@")[0] + "_ch",
-          bio: "Welcome to Midyeah!",
+          bio: "Welcome to MidYeah!",
           avatarUrl: randomAvatar,
           coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
           subscribersCount: 0
@@ -455,9 +455,9 @@ export default function App() {
         profile = {
           username: `midyeah_user_${formattedIndex}`,
           email: guestEmail,
-          channelName: `Midyeah Player ${formattedIndex}`,
+          channelName: `MidYeah Player ${formattedIndex}`,
           channelUrl: "guest_ch",
-          bio: "Welcome to Midyeah!",
+          bio: "Welcome to MidYeah!",
           avatarUrl: randomAvatar,
           coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
           subscribersCount: 0
@@ -497,9 +497,9 @@ export default function App() {
         const prof: UserProfile = {
           username: `midyeah_user_${formattedIndex}`,
           email: emailInput,
-          channelName: `Midyeah Player ${formattedIndex}`,
+          channelName: `MidYeah Player ${formattedIndex}`,
           channelUrl: emailInput.split("@")[0] + "_ch",
-          bio: "Thank you for watching on Midyeah, God bless everyone!",
+          bio: "Thank you for watching on MidYeah, God bless everyone!",
           avatarUrl: randomAnimeAvatar,
           coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
           subscribersCount: 0
@@ -535,7 +535,7 @@ export default function App() {
     
     try {
       // Simulate caching Blob or local index offsets in IDB
-      const dummyBlob = v.blob || new Blob(["Midyeah Video Cache File Data"], { type: "video/mp4" });
+      const dummyBlob = v.blob || new Blob(["MidYeah Video Cache File Data"], { type: "video/mp4" });
       
       const offlineVideo: Video = {
         ...v,
@@ -554,11 +554,11 @@ export default function App() {
     }
   };
 
-  const handleSaveToMidyeahLibrary = async (v: Video) => {
+  const handleSaveToMidYeahLibrary = async (v: Video) => {
     // Assuming this adds to a library in the DB
     try {
       // Logic for saving to a library
-      alert(`📚 '${v.title}' successfully saved to your Midyeah Offline Library.`);
+      alert(`📚 '${v.title}' successfully saved to your MidYeah Offline Library.`);
     } catch (err: any) {
       console.error("Failed to save to library:", err);
       alert(`Error saving to library: ${err.message || err}`);
@@ -1148,7 +1148,7 @@ export default function App() {
                               <div className="p-3 bg-purple-950/20 border border-purple-500/10 rounded-xl space-y-2">
                                 <p className="text-[10px] text-purple-300 font-semibold leading-relaxed">
                                   {uploadFile 
-                                    ? "✨ Midyeah will automatically scan and capture an optimal preview frame at 1.5s or halfway into the video stream." 
+                                    ? "✨ MidYeah will automatically scan and capture an optimal preview frame at 1.5s or halfway into the video stream." 
                                     : "📥 Please select a video file above to generate the automatic preview snapshot."}
                                 </p>
                                 {isGeneratingThumbnail && (
@@ -1366,7 +1366,7 @@ export default function App() {
                               video={currentVideo}
                               currUser={currUser}
                               onDownload={handleDownloadVideo}
-                              onSaveToLibrary={handleSaveToMidyeahLibrary}
+                              onSaveToLibrary={handleSaveToMidYeahLibrary}
                               isDownloaded={downloadedIds.includes(currentVideo.id)}
                               onSetTab={(tab) => setActiveTab(tab as any)}
                               onNext={handleNextVideo}

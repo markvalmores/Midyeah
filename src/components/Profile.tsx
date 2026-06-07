@@ -403,7 +403,7 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
               <label className="block text-slate-300 font-semibold mb-1 uppercase text-[10px]">Channel Bio/Description</label>
               <textarea
                 rows={3}
-                placeholder="Be comfortable when you watch on Midyeah streaming, God bless everyone..."
+                placeholder="Be comfortable when you watch on MidYeah streaming, God bless everyone..."
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 onBlur={handleBlur}
@@ -431,7 +431,7 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
           <div className="bg-[#1C1C1F] border border-white/10 rounded-2xl p-4 space-y-3.5">
             <div className="flex items-center gap-1.5 border-b border-white/5 pb-2 mb-1">
               <Award className="w-4 h-4 text-purple-400" />
-              <h3 className="font-bold text-xs text-white uppercase tracking-wider">Midyeah Partner Goals</h3>
+              <h3 className="font-bold text-xs text-white uppercase tracking-wider">MidYeah Partner Goals</h3>
             </div>
 
             <p className="text-[10px] text-gray-400 leading-relaxed">
@@ -553,7 +553,7 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
               <div className="text-center pb-4 border-b border-purple-950">
                 <span className="text-4xl">📧</span>
                 <h3 className="text-lg font-black text-yellow-300 mt-2">OFFICIAL CONGRATULATIONS: PARTNER LOG ACTIVE</h3>
-                <p className="text-[10px] text-purple-400 uppercase tracking-widest font-mono">From Midyeah Streaming Creator Network</p>
+                <p className="text-[10px] text-purple-400 uppercase tracking-widest font-mono">From MidYeah Streaming Creator Network</p>
               </div>
 
               {/* dynamic statistics graphics certificate card */}
@@ -621,7 +621,7 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
                 <h3 className="text-sm font-black text-white uppercase tracking-wider">Are you sure? - Step 1 of 2</h3>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed text-center">
-                Are you absolutely sure you want to permanently delete your Midyeah streamer account? 
+                Are you absolutely sure you want to permanently delete your MidYeah streamer account? 
                 This will wipe out your local profile documents, global credentials, and active subscriber history permanently.
               </p>
               <div className="flex gap-3 justify-center pt-2">

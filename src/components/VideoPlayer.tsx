@@ -803,14 +803,14 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
               <span>{isDownloaded ? "Saved Offline" : "Save to Device"}</span>
             </button>
             
-            {/* Save to Midyeah Library button */}
+            {/* Save to MidYeah Library button */}
             <button
               onClick={() => onSaveToLibrary(video)}
               className="flex items-center gap-1 text-xs px-3 py-1 rounded-xl font-medium bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-900/60 transition cursor-pointer"
               id="save-to-midyeah-lib-btn"
             >
               <FolderHeart className="w-3.5 h-3.5" />
-              <span>Save to Midyeah Library</span>
+              <span>Save to MidYeah Library</span>
             </button>
           </div>
         </div>

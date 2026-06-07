@@ -28,7 +28,7 @@ export default function Games() {
   // Handle score submits
   const postScore = (score: number, gameName: string) => {
     setLeaderboard(prev => {
-      const fresh = [...prev, { name: "You (Watching Midyeah)", score, game: gameName }];
+      const fresh = [...prev, { name: "You (Watching MidYeah)", score, game: gameName }];
       return fresh.sort((a,b) => b.score - a.score).slice(0, 10);
     });
   };
@@ -66,7 +66,7 @@ export default function Games() {
               id="game-select-tetris"
             >
               <span className="text-2xl group-hover:scale-110 transition-transform mb-2">🧱</span>
-              <h3 className="font-bold text-white text-xs">Midyeah Blocks</h3>
+              <h3 className="font-bold text-white text-xs">MidYeah Blocks</h3>
               <p className="text-[10px] text-gray-400 mt-1">Retro Tetris mode</p>
             </button>
 
@@ -236,7 +236,7 @@ function TetrisGame({ onGameEnd }: { onGameEnd: (score: number) => void }) {
   return (
     <div className="flex flex-col items-center">
       <div className="flex justify-between w-full px-2 mb-2">
-        <span className="text-xs text-purple-400 font-bold">Midyeah Blocks Game</span>
+        <span className="text-xs text-purple-400 font-bold">MidYeah Blocks Game</span>
         <span className="text-xs text-white font-mono font-bold bg-purple-950 px-2 py-0.5 rounded">Score: {score}</span>
       </div>
 

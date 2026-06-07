@@ -16,10 +16,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const slides = [
     {
-      title: "Welcome to Midyeah! 💜☕",
+      title: "Welcome to MidYeah! 💜☕",
       subtitle: "Created by Mark David Valmores",
       icon: "🐰",
-      text: "Midyeah is your joyful online video streaming and live broadcasting shelter. Enjoy secure, strict safe guidelines to ensure every watcher is happy and comfortable!",
+      text: "MidYeah is your joyful online video streaming and live broadcasting shelter. Enjoy secure, strict safe guidelines to ensure every watcher is happy and comfortable!",
       actionText: "Let's Get Started"
     },
     {
@@ -34,7 +34,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       subtitle: "The Creator Partnership Goal",
       icon: "🌟",
       text: "Ready to monetise? Reach 777 subscribers, 340 watch hours, and 3400 total likes to achieve Partnership! You'll secure GCash & PayPal withdrew credentials. And please subscribe to the owners YouTube channel: https://www.youtube.com/@UsagyuunVtuber!",
-      actionText: "Enjoy Midyeah Now"
+      actionText: "Enjoy MidYeah Now"
     }
   ];
 

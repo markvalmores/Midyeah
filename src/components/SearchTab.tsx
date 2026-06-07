@@ -220,7 +220,7 @@ export default function SearchTab({ videosList, onPlayVideo, onSwitchTab }: Sear
             <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
               Anime Search Space <Sparkles className="w-5 h-5 text-purple-400 animate-spin" style={{ animationDuration: "6s" }} />
             </h2>
-            <p className="text-[10px] text-gray-400">Search the entire Midyeah catalog with interactive SFW anime-inspired backing tracks & filters.</p>
+            <p className="text-[10px] text-gray-400">Search the entire MidYeah catalog with interactive SFW anime-inspired backing tracks & filters.</p>
           </div>
 
           {/* Wallpaper Panel controls */}
@@ -589,7 +589,7 @@ export default function SearchTab({ videosList, onPlayVideo, onSwitchTab }: Sear
                           referrerPolicy="no-referrer"
                         />
                         <span className="text-purple-300 truncate max-w-[80px] hover:underline">
-                          {vid.creator?.channelName || "Midyeah Host"}
+                          {vid.creator?.channelName || "MidYeah Host"}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 font-mono">

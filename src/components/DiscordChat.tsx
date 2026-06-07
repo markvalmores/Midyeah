@@ -103,7 +103,7 @@ export default function DiscordChat({ currUser }: DiscordChatProps) {
 
   const getChannelFilterText = () => {
     const active = channels.find(c => c.id === activeChannel);
-    return active ? active.desc : "Midyeah group discussions";
+    return active ? active.desc : "MidYeah group discussions";
   };
 
   return (
@@ -113,7 +113,7 @@ export default function DiscordChat({ currUser }: DiscordChatProps) {
       <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-white/10 pb-3 md:pb-0 md:pr-3 flex flex-col">
         <div className="flex items-center gap-1.5 pb-2 mb-2 border-b border-white/10">
           <MessageSquare className="w-4 h-4 text-purple-400" />
-          <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">Midyeah Channels</h3>
+          <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">MidYeah Channels</h3>
         </div>
 
         <div className="flex-1 flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible md:overflow-y-auto scrollbar-thin py-1 pr-1">

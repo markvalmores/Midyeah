@@ -14,16 +14,16 @@ interface MascotProps {
 
 export default function Mascot({ showTutorialInitially = false, onCloseTutorial }: MascotProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [bubbleText, setBubbleText] = useState("Hi there, I'm Midy! Welcome to Midyeah, your happy stream spot! ☕🐰");
+  const [bubbleText, setBubbleText] = useState("Hi there, I'm Midy! Welcome to MidYeah, your happy stream spot! ☕🐰");
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
 
   const tips = [
     "I love coffee! Remember to take healthy screen breaks and sip some warm water or coffee too! ☕",
     "Did you know? You can play games like Tetris, 2048, or Catch the Fruit while watching any video!",
-    "Midyeah is a safe space. We follow strict guidelines to make sure everyone is happy and comfortable! 🛡️",
+    "MidYeah is a safe space. We follow strict guidelines to make sure everyone is happy and comfortable! 🛡️",
     "Are you a creator? Switch to 'Creator Mode' at the top to upload videos, start live streams, and earn tips!",
     "Wanna watch with friends? Try creating or joining a 'Public / Private Watch Room' to stream and video chat together!",
-    "Accidentally closed your tab? No worries! Midyeah saves your video play offset so you can continue right where you left off!"
+    "Accidentally closed your tab? No worries! MidYeah saves your video play offset so you can continue right where you left off!"
   ];
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function Mascot({ showTutorialInitially = false, onCloseTutorial 
 
   const tutorialSteps = [
     {
-      title: "Welcome to Midyeah! 🐰✨",
+      title: "Welcome to MidYeah! 🐰✨",
       text: "I am Midy, your Purple Bunny companion! I'm here to ensure you stay joyful, safe, and comfortable. Let me show you around this amazing platform!",
       actionText: "Let's Go!"
     },
@@ -72,7 +72,7 @@ export default function Mascot({ showTutorialInitially = false, onCloseTutorial 
       setTutorialStep(tutorialStep + 1);
     } else {
       setTutorialStep(null);
-      setBubbleText("Awesome! You're ready to enjoy Midyeah. May the Lord bless your streaming journey! 💜");
+      setBubbleText("Awesome! You're ready to enjoy MidYeah. May the Lord bless your streaming journey! 💜");
       if (onCloseTutorial) onCloseTutorial();
     }
   };

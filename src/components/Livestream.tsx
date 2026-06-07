@@ -41,7 +41,7 @@ export default function Livestream() {
   const [liveGuesses, setLiveGuesses] = useState<string>("");
   const guessesList = [
     "...we are going to build something incredible today with God's guidance!",
-    "...it is very cozy on Midyeah streaming platform, we hope everyone is comfortable",
+    "...it is very cozy on MidYeah streaming platform, we hope everyone is comfortable",
     "...thank you so much to all the Gcash and PayPal donors supporting the channel",
     "...next up, we are going to look at the custom radio visualizers and playlist mode",
     "...Midy Bunny is cheering us on! Praise God from whom all blessings flow!"
@@ -85,7 +85,7 @@ export default function Livestream() {
         "Just tipped you 150 Php via GCash! Stream is amazing!",
         "Can we play Tetris while watching this live stream?",
         "Beautiful purple dark mode ☕🐰",
-        "God bless Midyeah owners and developers!",
+        "God bless MidYeah owners and developers!",
         "The live subtitle guesser is shockingly accurate!"
       ];
 
@@ -123,7 +123,7 @@ export default function Livestream() {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
-      alert("No hardware capture device found or Permission denied. Midyeah will proceed with simulated cozy Purple Avatar video stream backup feed!");
+      alert("No hardware capture device found or Permission denied. MidYeah will proceed with simulated cozy Purple Avatar video stream backup feed!");
       setIsLive(true); // simulated live
       setViewsCount(Math.floor(Math.random() * 8 + 4));
     }

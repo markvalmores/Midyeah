@@ -104,7 +104,7 @@ export default function WatchRoom() {
     
     // initial room chat greet
     setRoomChats([
-      { sender: "Midyeah Mascot Bunny 🐰", text: `Welcome to the watch room '${newRoomName}'! Invite others using copyable stream key or Code ${code}` }
+      { sender: "MidYeah Mascot Bunny 🐰", text: `Welcome to the watch room '${newRoomName}'! Invite others using copyable stream key or Code ${code}` }
     ]);
   };
 
