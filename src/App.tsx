@@ -1166,14 +1166,6 @@ export default function App() {
               <span className="hidden md:inline">Videos</span>
             </button>
             <button
-              onClick={() => { setActiveTab("membersPlus"); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "membersPlus" ? "bg-yellow-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
-              id="nav-tab-members-plus"
-            >
-              <Award className="w-4 h-4" />
-              <span className="hidden sm:inline">Members+</span>
-            </button>
-            <button
               onClick={() => { setActiveTab("search"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "search" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-search"
@@ -2336,9 +2328,7 @@ export default function App() {
 
         </AnimatePresence>
 
-        {/* {isMembersPlusMode && currUser && (
-          <MembersPlusPage currUser={currUser} creatorProfile={currUser} />
-        )} */}
+
       </motion.main>
 
       {/* 3. HARDWARE CONSOLE HANDHELD CONTROLLER STYLE SHEETS */}
