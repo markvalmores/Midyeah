@@ -761,15 +761,23 @@ export function subscribeAllVideos(callback: (videos: Video[]) => void): () => v
       const cachedMap = new Map<string, Video>();
       cachedDbVideos.forEach(v => {
         if (v.blob) {
-          const existingUrl = objectUrlCache.get(v.id);
-          if (existingUrl) {
-            v.videoUrl = existingUrl;
-          } else {
-            const url = URL.createObjectURL(v.blob);
-            objectUrlCache.set(v.id, url);
-            v.videoUrl = url;
+          try {
+            if (v.blob instanceof Blob) {
+              const existingUrl = objectUrlCache.get(v.id);
+              if (existingUrl) {
+                v.videoUrl = existingUrl;
+              } else {
+                const url = URL.createObjectURL(v.blob);
+                objectUrlCache.set(v.id, url);
+                v.videoUrl = url;
+              }
+              v.isOffline = true;
+            } else {
+              console.warn("Cached item blob is not an instance of Blob. Reference:", v.id);
+            }
+          } catch (blobErr) {
+            console.error("Failed to map local blob url for video id: " + v.id, blobErr);
           }
-          v.isOffline = true;
         }
         cachedMap.set(v.id, v);
       });
@@ -859,15 +867,23 @@ export async function getAllVideos(): Promise<Video[]> {
   const cachedMap = new Map<string, Video>();
   cachedDbVideos.forEach(v => {
     if (v.blob) {
-      const existingUrl = objectUrlCache.get(v.id);
-      if (existingUrl) {
-        v.videoUrl = existingUrl;
-      } else {
-        const url = URL.createObjectURL(v.blob);
-        objectUrlCache.set(v.id, url);
-        v.videoUrl = url;
+      try {
+        if (v.blob instanceof Blob) {
+          const existingUrl = objectUrlCache.get(v.id);
+          if (existingUrl) {
+            v.videoUrl = existingUrl;
+          } else {
+            const url = URL.createObjectURL(v.blob);
+            objectUrlCache.set(v.id, url);
+            v.videoUrl = url;
+          }
+          v.isOffline = true;
+        } else {
+          console.warn("Cached item blob is not a blob instance:", v.id);
+        }
+      } catch (blobErr) {
+        console.error("Failed to map local blob url inside getAllVideos:", blobErr);
       }
-      v.isOffline = true;
     }
     cachedMap.set(v.id, v);
   });
