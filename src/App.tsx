@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Video as VideoIcon, Tv, Radio, Gamepad, Gamepad2, User, LogIn, Plus, Sparkles, Youtube, ExternalLink,
+  Video as VideoIcon, Tv, Radio, Gamepad, Gamepad2, User, LogIn, Plus, Sparkles, Youtube, ExternalLink, Smile,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
   Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search, Info, MonitorPlay, Award
 } from "lucide-react";
@@ -1223,11 +1223,11 @@ export default function App() {
             </button>
             <button
               onClick={() => { setActiveTab("youtubeEmbed"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "youtubeEmbed" ? "bg-red-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "youtubeEmbed" ? "bg-yellow-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-youtubeEmbed"
             >
-              <Youtube className="w-4 h-4" />
-              <span className="hidden md:inline">YouTube</span>
+              <Smile className="w-4 h-4" />
+              <span className="hidden md:inline">Worlds</span>
             </button>
             <button
               onClick={() => { setActiveTab("playlists"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
