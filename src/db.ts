@@ -92,6 +92,7 @@ export interface FirestoreErrorInfo {
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   if (error instanceof Error && (error.message.includes("resource-exhausted") || (error as any).code === "resource-exhausted")) {
     isSyncStabilized = false;
+    setTimeout(() => { isSyncStabilized = true; }, 60000 * 5); // Auto-heal sync engine after 5 mins
   }
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -247,6 +248,7 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
             // If quota likely hit or network died, just stop trying remotely but continue locally
             if (err.message.includes("Quota") || err.message.includes("timeout")) {
                 isSyncStabilized = false; 
+                setTimeout(() => { isSyncStabilized = true; }, 60000 * 5); // Auto-heal sync engine after 5 mins
                 return; // Silently stop chunking but return cleanly
             }
             throw err;
@@ -266,6 +268,7 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
         isSyncStabilized = false;
+        setTimeout(() => { isSyncStabilized = true; }, 60000 * 5); // Auto-heal
     }
     console.warn("Incremental global video sync paused or deferred:", err);
   }
@@ -706,6 +709,7 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
       } catch (err: any) {
         if (err.message && err.message.includes("resource-exhausted")) {
           isSyncStabilized = false;
+          setTimeout(() => { isSyncStabilized = true; }, 60000 * 5); // Auto-heal
         }
         console.warn("Firestore video synchronization failed, continuing with local-only state:", err);
       }
@@ -1109,7 +1113,10 @@ export function subscribeVideoComments(videoId: string, callback: (comments: Com
 export async function toggleSubscription(followerEmail: string, followedEmail: string): Promise<boolean> {
   if (followerEmail === followedEmail) return false;
   
-  const subId = `${followerEmail}_follows_${followedEmail}`;
+  // Sanitize ID for Firestore document safety
+  const safeFollower = followerEmail.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const safeFollowed = followedEmail.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const subId = `${safeFollower}_follows_${safeFollowed}`;
   const subRef = doc(db, "subscriptions", subId);
   const profileRef = doc(db, "profiles", followedEmail);
   
@@ -1148,7 +1155,9 @@ export async function toggleSubscription(followerEmail: string, followedEmail: s
 }
 
 export async function checkSubscriptionStatus(followerEmail: string, followedEmail: string): Promise<boolean> {
-  const subId = `${followerEmail}_follows_${followedEmail}`;
+  const safeFollower = followerEmail.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const safeFollowed = followedEmail.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const subId = `${safeFollower}_follows_${safeFollowed}`;
   const subRef = doc(db, "subscriptions", subId);
   try {
     const subSnap = await getDoc(subRef);
@@ -1199,7 +1208,9 @@ export function subscribeToSubscribersCount(email: string, callback: (count: num
 
 // Group Membership Logic
 export async function toggleGroupMembership(email: string, groupId: string): Promise<boolean> {
-  const membershipId = `${email}_in_${groupId}`;
+  const safeEmail = email.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const safeGroup = groupId.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const membershipId = `${safeEmail}_in_${safeGroup}`;
   const membershipRef = doc(db, "group_memberships", membershipId);
   
   try {
@@ -1222,7 +1233,9 @@ export async function toggleGroupMembership(email: string, groupId: string): Pro
 }
 
 export async function checkGroupStatus(email: string, groupId: string): Promise<boolean> {
-  const membershipId = `${email}_in_${groupId}`;
+  const safeEmail = email.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const safeGroup = groupId.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
+  const membershipId = `${safeEmail}_in_${safeGroup}`;
   const membershipRef = doc(db, "group_memberships", membershipId);
   try {
     const memSnap = await getDoc(membershipRef);

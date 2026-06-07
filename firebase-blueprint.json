@@ -180,6 +180,9 @@
       "schema": "Subscription",
       "description": "Mappings which describe subscriber counts dynamically"
     },
+    "/group_memberships/{membershipId}": {
+      "description": "User memberships in creator communities"
+    },
     "/likes_dislikes/{likeId}": {
       "schema": "LikeDislike",
       "description": "Persistent record keeping user specific standard likes and dislikes"

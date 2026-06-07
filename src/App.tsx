@@ -118,7 +118,6 @@ export default function App() {
     if (currentVideo) {
       const latestVideo = videosList.find(v => v.id === currentVideo.id);
       if (latestVideo) {
-        // Check for any modified statistics or metadata
         if (
           latestVideo.likes !== currentVideo.likes ||
           latestVideo.dislikes !== currentVideo.dislikes ||
@@ -130,34 +129,10 @@ export default function App() {
       }
     }
   }, [videosList, currentVideo]);
+
   const [downloadedIds, setDownloadedIds] = useState<string[]>([]);
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
-
-  // GHOST CLEANUP TRIGGER: Specifically target the "Good Morning" ghost or any invalid videos
-  useEffect(() => {
-    if (videosList.length > 0) {
-      // SUSPICIOUS_ID list: Explicitly kill known bugged IDs
-      const suspiciousIds = ["good_morning", "good-morning", "vid_ghost", "vid_17", "vid_placeholder"]; 
-      
-      const toKill = videosList.filter(v => 
-        suspiciousIds.some(s => v.id.toLowerCase() === s) || 
-        (v.title.toLowerCase().includes("good morning") && v.id.includes("ghost")) || // Only kill real ghosts
-        (v.creator.email === "guest@midyeah.com" && v.title === "Untitled Presentation" && !v.id.includes(Date.now().toString().substring(0, 8))) // Allow recent guest uploads
-      );
-      
-      if (toKill.length > 0) {
-        console.log(`[Eradicator] Hard-delete ${toKill.length} ghost/invalid videos...`);
-        toKill.forEach(v => {
-           // Delete from DB completely (Coding codes focus)
-           deleteVideo(v.id).then(() => {
-              setVideosList(prev => prev.filter(item => item.id !== v.id));
-              console.log(`[Eradicator] Permanently removed: ${v.id}`);
-           }).catch(e => console.warn("Ghost kill error:", e));
-        });
-      }
-    }
-  }, [videosList]);
 
   const handleDeleteSingleVideo = async (id: string) => {
     try {

@@ -72,6 +72,31 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     }
   }, [video]);
 
+  // Sync subscription and group membership status
+  useEffect(() => {
+    async function syncStatus() {
+      if (currUser && video && video.creator) {
+        try {
+          const subbed = await checkSubscriptionStatus(currUser.email, video.creator.email);
+          setIsSubscribed(subbed);
+          
+          const groupId = video.creator.channelUrl || "midyeah_group";
+          const joined = await checkGroupStatus(currUser.email, groupId);
+          setIsGroupMember(joined);
+
+          const rating = await getLikeDislikeStatus(currUser.email, video.id);
+          setHasRated(rating);
+        } catch (e) {
+          console.warn("Status check failed:", e);
+        }
+      } else {
+        setIsSubscribed(false);
+        setIsGroupMember(false);
+      }
+    }
+    syncStatus();
+  }, [currUser, video]);
+
   const [aiSubtitles, setAiSubtitles] = useState<VideoSub[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<string>("");
   const [showSettings, setShowSettings] = useState(false);

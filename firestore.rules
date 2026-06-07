@@ -17,7 +17,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 256 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
+      return id is string && id.size() <= 256 && id.matches('^[a-zA-Z0-9_\\-\\.\\@\\+]+$');
     }
 
     // Form/payload schema validators
@@ -25,7 +25,8 @@ service cloud.firestore {
       return data.username is string && data.username.size() <= 100
           && data.email is string && data.email.size() <= 100
           && data.channelName is string && data.channelName.size() <= 100
-          && data.channelUrl is string && data.channelUrl.size() <= 100;
+          && data.channelUrl is string && data.channelUrl.size() <= 100
+          && (data.subscribersCount == null || data.subscribersCount is int);
     }
 
     function isValidVideo(data) {
@@ -84,9 +85,10 @@ service cloud.firestore {
 
     // 2. User Profiles mapping
     match /profiles/{email} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isSignedIn() && isOwner(email) && isValidUserProfile(request.resource.data);
-      allow update: if isSignedIn() && isOwner(email) && isValidUserProfile(request.resource.data);
+      allow update: if (isSignedIn() && isOwner(email) && isValidUserProfile(request.resource.data))
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscribersCount']));
       allow delete: if isSignedIn() && isOwner(email);
     }
 
