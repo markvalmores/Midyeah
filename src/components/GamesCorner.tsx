@@ -47,24 +47,28 @@ export default function GamesCorner() {
           >
             <Maximize className="w-4 h-4" />
           </button>
-          <button 
-            onClick={() => window.open(selectedGame.url, '_blank', 'noopener,noreferrer')}
-            className="p-1.5 ml-1 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
-            title="Open in New Tab"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </button>
         </div>
       </div>
       <div className="flex gap-2 px-2">
         {games.map(game => (
-          <button
-            key={game.title}
-            onClick={() => setSelectedGame(game)}
-            className={`px-4 py-1.5 rounded-lg text-white text-sm ${selectedGame.title === game.title ? "bg-purple-600" : "bg-purple-900"}`}
-          >
-            {game.title}
-          </button>
+          <div key={game.title} className={`flex items-center rounded-lg ${selectedGame.title === game.title ? "bg-purple-600" : "bg-purple-900"}`}>
+            <div
+              onClick={() => {
+                setSelectedGame(game);
+                window.open(game.url, '_blank', 'noopener,noreferrer');
+              }}
+              className="px-3 py-1.5 text-white text-sm cursor-pointer hover:underline font-medium"
+            >
+              {game.title}
+            </div>
+            <button 
+              onClick={() => window.open(game.url, '_blank', 'noopener,noreferrer')}
+              className={`p-1.5 mr-1 rounded-md text-white/80 hover:text-white transition ${selectedGame.title === game.title ? "hover:bg-purple-500" : "hover:bg-purple-800"}`}
+              title="Open in New Tab"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
         ))}
       </div>
       <div ref={iframeContainerRef} className="overflow-auto flex-grow rounded-2xl border border-white/10 bg-black">

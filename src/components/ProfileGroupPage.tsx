@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send, UploadCloud, X, Film, Image as ImageIcon } from "lucide-react";
 import { UserProfile, DiscordMessage } from "../types";
-import { collection, onSnapshot, query, where, setDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, setDoc, doc, limit, orderBy } from "firebase/firestore";
 import { db, isGuestAccount, openDB } from "../db";
 
 interface ProfileGroupPageProps {
@@ -47,7 +47,12 @@ export default function ProfileGroupPage({ currUser, groupProfile, onBack, onLog
   }, [groupId]);
 
   useEffect(() => {
-    const q = query(collection(db, "group_messages"), where("groupId", "==", groupId));
+    const q = query(
+      collection(db, "group_messages"), 
+      where("groupId", "==", groupId),
+      orderBy("timestamp", "desc"),
+      limit(100)
+    );
     const unsubscribe = onSnapshot(q, (snap) => {
       const msgs: DiscordMessage[] = [];
       snap.forEach(docSnap => {

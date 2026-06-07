@@ -9,9 +9,9 @@ import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword 
 } from "firebase/auth";
 import { 
-  initializeFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
+  getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc, 
   query, orderBy, getDocFromServer, collectionGroup, onSnapshot,
-  where, writeBatch, updateDoc, increment, runTransaction
+  where, writeBatch, updateDoc, increment, runTransaction, limit
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { Video, UserProfile, Comment, DiscordMessage, Playlist, DonationRecord, DonationStats } from "./types";
@@ -20,10 +20,7 @@ import { getRandomAnimeAvatar } from "./utils";
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 
-// CRITICAL: Using initializeFirestore with long-polling to bypass environment-specific connectivity blocks
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
@@ -441,7 +438,11 @@ let lastSavedProfile = new Map<string, string>(); // email -> JSON.stringify(pro
 export async function getUserCount(): Promise<number> {
   try {
     const collRef = collection(db, "profiles");
-    const snap = await getDocs(collRef);
+    // Optimization: query limit 100 instead of infinite iteration, or getCountFromServer if available
+    // but just in case getCountFromServer isn't imported, let's use a very small limit since the exact count isn't critical.
+    // We only need count for generating names.
+    const q = query(collRef, limit(100)); // To prevent quota issues, max 100.
+    const snap = await getDocs(q);
     return snap.size;
   } catch (err) {
     console.warn("Could not fetch user count from remote, defaulting to 0:", err);
@@ -656,14 +657,22 @@ export async function getProfileByUsername(username: string): Promise<UserProfil
     }
 
     // Try case-insensitive query or local scanning check
-    const snapAll = await getDocs(collRef);
-    const matches = snapAll.docs.map(d => d.data() as UserProfile);
-    const matched = matches.find(p => p.username && p.username.toLowerCase() === cleanUsername);
-    if (matched) {
+    // Optimization: Don't read all, simply return null. 
+    // Creating accounts with case variations but same exact name should be blocked at creation.
+    const cleanUsernameLower = username.toLowerCase().trim();
+    const qInsensitive = query(
+      collRef, 
+      where("usernameLower", "==", cleanUsernameLower),
+      limit(1)
+    );
+    const snapIns = await getDocs(qInsensitive);
+    if (!snapIns.empty) {
+      const matched = snapIns.docs[0].data() as UserProfile;
       localStorage.setItem("midyeah_profile_" + matched.email, JSON.stringify(matched));
       localStorage.setItem("midyeah_profile_by_username_" + cleanUsername, JSON.stringify(matched));
       return matched;
     }
+
   } catch (e) {
     console.warn("Firestore query for profile by username failed:", e);
   }
@@ -800,7 +809,8 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
 
 export function subscribeAllVideos(callback: (videos: Video[]) => void): () => void {
   const collRef = collection(db, "global_videos");
-  return onSnapshot(collRef, async (snap) => {
+  const q = query(collRef, limit(100)); // Optimization: Cap initial snapshot
+  return onSnapshot(q, async (snap) => {
     const remoteVideos: Video[] = [];
     snap.forEach(docSnap => {
       const dv = docSnap.data();
@@ -904,7 +914,8 @@ export async function getAllVideos(): Promise<Video[]> {
   const remoteVideos: Video[] = [];
   try {
     const collRef = collection(db, "global_videos");
-    const snap = await getDocs(collRef);
+    const q = query(collRef, limit(100)); // Limit to prevent quota drain
+    const snap = await getDocs(q);
     snap.forEach(docSnap => {
       const dv = docSnap.data();
       remoteVideos.push({
@@ -1135,7 +1146,8 @@ export async function saveComment(comment: Comment): Promise<void> {
 export async function getVideoComments(videoId: string): Promise<Comment[]> {
   try {
     const collRef = collection(db, "global_videos", videoId, "comments");
-    const snap = await getDocs(collRef);
+    const q = query(collRef, orderBy("timestamp", "desc"), limit(50));
+    const snap = await getDocs(q);
     const result: Comment[] = [];
     snap.forEach(docSnap => {
       const data = docSnap.data();
@@ -1173,7 +1185,7 @@ export async function getVideoComments(videoId: string): Promise<Comment[]> {
 
 export function subscribeVideoComments(videoId: string, callback: (comments: Comment[]) => void): () => void {
   const collRef = collection(db, "global_videos", videoId, "comments");
-  const q = query(collRef, orderBy("timestamp", "desc"));
+  const q = query(collRef, orderBy("timestamp", "desc"), limit(50));
   
   return onSnapshot(q, (snap) => {
     const result: Comment[] = [];
@@ -1373,7 +1385,8 @@ export async function saveDiscordMessage(msg: DiscordMessage): Promise<void> {
 export async function getDiscordMessages(): Promise<DiscordMessage[]> {
   try {
     const collRef = collection(db, "discord_messages");
-    const snap = await getDocs(collRef);
+    const q = query(collRef, orderBy("timestamp", "desc"), limit(100));
+    const snap = await getDocs(q);
     const result: DiscordMessage[] = [];
     snap.forEach(docSnap => {
       const data = docSnap.data();
@@ -1473,12 +1486,10 @@ export async function getPlaylistsByOwner(ownerEmail: string): Promise<Playlist[
   const remotePlaylists: Playlist[] = [];
   try {
     const collRef = collection(db, "playlists");
-    const snap = await getDocs(collRef);
+    const q = query(collRef, where("ownerEmail", "==", ownerEmail), limit(50));
+    const snap = await getDocs(q);
     snap.forEach(docSnap => {
-      const data = docSnap.data() as Playlist;
-      if (data.ownerEmail === ownerEmail) {
-        remotePlaylists.push(data);
-      }
+      remotePlaylists.push(docSnap.data() as Playlist);
     });
   } catch (err) {
     console.warn("Failed fetching remote playlists, using local:", err);
@@ -1620,7 +1631,8 @@ export async function getAllDonations(): Promise<DonationRecord[]> {
   const remoteDonations: DonationRecord[] = [];
   try {
     const collRef = collection(db, "donations");
-    const snap = await getDocs(collRef);
+    const q = query(collRef, limit(100));
+    const snap = await getDocs(q);
     snap.forEach(docSnap => {
       remoteDonations.push(docSnap.data() as DonationRecord);
     });

@@ -8,7 +8,7 @@ import { Hash, MessageSquare, Send, Bell, Settings, HelpCircle, ShieldAlert } fr
 import { motion, AnimatePresence } from "motion/react";
 import { getDiscordMessages, saveDiscordMessage, db, isGuestAccount } from "../db";
 import { DiscordMessage, UserProfile } from "../types";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import MessengerChat from "./MessengerChat";
 
 interface DiscordChatProps {
@@ -33,7 +33,12 @@ export default function DiscordChat({ currUser }: DiscordChatProps) {
 
   // Subscribe to real-time worldwide messages in Firestore
   useEffect(() => {
-    const q = query(collection(db, "discord_messages"), orderBy("timestamp", "asc"));
+    // Optimization: Added limit(100) to reduce initial snapshot reads and prevent quota issues
+    const q = query(
+      collection(db, "discord_messages"), 
+      orderBy("timestamp", "desc"), // Order desc for limit
+      limit(100)
+    );
     const unsubscribe = onSnapshot(q, (snap) => {
       const msgs: DiscordMessage[] = [];
       snap.forEach((docSnap) => {
@@ -46,6 +51,9 @@ export default function DiscordChat({ currUser }: DiscordChatProps) {
           timestamp: data.timestamp || new Date().toISOString()
         });
       });
+      // Re-sort asc for the chat log view
+      msgs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      
       if (msgs.length > 0) {
         setMessages(msgs);
       }

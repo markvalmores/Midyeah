@@ -4,7 +4,7 @@ import {
   Award, Heart, MessageSquare, ThumbsUp, ThumbsDown, Trash2, Settings, 
   Upload, UserPlus, UserMinus, UserCheck, Image as ImageIcon, X
 } from "lucide-react";
-import { doc, getDoc, setDoc, query, collection, orderBy, onSnapshot, deleteDoc, updateDoc, arrayUnion, arrayRemove, increment } from "firebase/firestore";
+import { doc, getDoc, setDoc, query, collection, orderBy, onSnapshot, deleteDoc, updateDoc, arrayUnion, arrayRemove, increment, limit } from "firebase/firestore";
 import { db, auth } from "../db";
 import { UserProfile } from "../types";
 
@@ -30,12 +30,13 @@ export default function MembersPlusPage({ currUser, creatorProfile }: { currUser
   useEffect(() => {
     const q = query(
       collection(db, "members_plus_posts"),
-      orderBy("timestamp", "desc")
+      orderBy("timestamp", "desc"),
+      limit(50)
     );
     return onSnapshot(q, (snapshot) => {
       const p = snapshot.docs.map(doc => ({ ...doc.data() as Post, id: doc.id }));
       setPosts(p);
-    });
+    }, (err) => console.warn("MembersPlus snapshot error:", err));
   }, []);
 
   const handlePost = async () => {

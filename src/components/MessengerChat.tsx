@@ -7,9 +7,9 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, DiscordMessage } from "../types";
 import { 
-  collection, onSnapshot, query, orderBy, setDoc, doc, getDocs, where, deleteDoc 
+  collection, onSnapshot, query, orderBy, setDoc, doc, getDocs, where, deleteDoc, limit, or 
 } from "firebase/firestore";
-import { db, isGuestAccount, openDB } from "../db";
+import { db, isGuestAccount, openDB, getProfile } from "../db";
 
 interface MessengerChatProps {
   currUser: UserProfile | null;
@@ -163,42 +163,44 @@ export default function MessengerChat({ currUser }: MessengerChatProps) {
     };
     loadProfiles();
 
-    // Subscribe to Friendships
-    const qFriends = query(collection(db, "friendships"));
-    const unsubFriends = onSnapshot(qFriends, (snap) => {
-      const pms: string[] = [];
+    // Subscribe to Friendships - Optimized with Query Constraints
+    const qFriends = query(
+      collection(db, "friendships"),
+      or(where("userA", "==", currUser.email), where("userB", "==", currUser.email))
+    );
+    const unsubFriends = onSnapshot(qFriends, async (snap) => {
+      const companionEmails: string[] = [];
       snap.forEach(docSnap => {
         const data = docSnap.data();
-        if (data.userA === currUser.email) pms.push(data.userB);
-        if (data.userB === currUser.email) pms.push(data.userA);
+        if (data.userA === currUser.email) companionEmails.push(data.userB);
+        if (data.userB === currUser.email) companionEmails.push(data.userA);
       });
       
-      // Keep unique and map to corresponding User Profile data
-      const uniqEmails = Array.from(new Set(pms));
-      getDocs(collection(db, "profiles")).then((profs) => {
-        const mapped: UserProfile[] = [];
-        profs.forEach(pSnap => {
-          const profile = pSnap.data() as UserProfile;
-          if (uniqEmails.includes(profile.email)) {
-            mapped.push(profile);
-          }
-        });
-        setFriendsList(mapped);
-      });
-    });
+      if (companionEmails.length === 0) {
+        setFriendsList([]);
+        return;
+      }
 
-    // Subscribe to GCs
-    const qGC = query(collection(db, "group_chats"));
+      // Optimization: Fetch only specific profiles instead of scanning entire collection
+      const companionProfiles: UserProfile[] = [];
+      for (const email of companionEmails) {
+        companionProfiles.push(await getProfile(email));
+      }
+      setFriendsList(companionProfiles.filter(p => p !== null));
+    }, (err) => console.warn("Friends snapshot error:", err));
+
+    // Subscribe to GCs - Optimized with Query Constraint
+    const qGC = query(
+      collection(db, "group_chats"),
+      where("memberEmails", "array-contains", currUser.email)
+    );
     const unsubGC = onSnapshot(qGC, (snap) => {
       const gcs: GroupChat[] = [];
       snap.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data.memberEmails && data.memberEmails.includes(currUser.email)) {
-          gcs.push(data as GroupChat);
-        }
+        gcs.push(docSnap.data() as GroupChat);
       });
       setGroupChats(gcs);
-    });
+    }, (err) => console.warn("GCs snapshot error:", err));
 
     return () => {
       unsubFriends();
@@ -212,7 +214,9 @@ export default function MessengerChat({ currUser }: MessengerChatProps) {
 
     const qMsgs = query(
       collection(db, "messenger_messages"), 
-      where("chatId", "==", activeChatId)
+      where("chatId", "==", activeChatId),
+      orderBy("timestamp", "desc"),
+      limit(100)
     );
     
     const unsubMsgs = onSnapshot(qMsgs, (snap) => {
@@ -225,7 +229,7 @@ export default function MessengerChat({ currUser }: MessengerChatProps) {
       setTimeout(() => {
         logBottomRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 50);
-    });
+    }, (err) => console.warn("Messages snapshot error:", err));
 
     // Load Chat Custom Theme settings
     const unsubTheme = onSnapshot(doc(db, "messenger_settings", activeChatId), (docSnap) => {
@@ -243,7 +247,7 @@ export default function MessengerChat({ currUser }: MessengerChatProps) {
           themeName: "Twilight Gradient"
         });
       }
-    });
+    }, (err) => console.warn("Theme snapshot error:", err));
 
     return () => {
       unsubMsgs();
