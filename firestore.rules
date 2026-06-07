@@ -96,8 +96,8 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(videoId) 
                     && request.resource.data.creatorEmail == request.auth.token.email
                     && isValidVideo(request.resource.data);
-      allow update: if isSignedIn() && isValidId(videoId)
-                    && (resource.data.creatorEmail == request.auth.token.email || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'dislikes']))
+      allow update: if isValidId(videoId)
+                    && ( (isSignedIn() && resource.data.creatorEmail == request.auth.token.email) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'dislikes', 'reactions']) )
                     && isValidVideo(request.resource.data);
       allow delete: if isSignedIn() && isValidId(videoId) && resource.data.creatorEmail == request.auth.token.email;
 

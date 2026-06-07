@@ -112,6 +112,24 @@ export default function App() {
 
   // Video datasets
   const [videosList, setVideosList] = useState<Video[]>([]);
+
+  // Keep currentVideo data in sync with real-time updates from the database
+  useEffect(() => {
+    if (currentVideo) {
+      const latestVideo = videosList.find(v => v.id === currentVideo.id);
+      if (latestVideo) {
+        // Check for any modified statistics or metadata
+        if (
+          latestVideo.likes !== currentVideo.likes ||
+          latestVideo.dislikes !== currentVideo.dislikes ||
+          latestVideo.views !== currentVideo.views ||
+          JSON.stringify(latestVideo.reactions) !== JSON.stringify(currentVideo.reactions)
+        ) {
+          setCurrentVideo(latestVideo);
+        }
+      }
+    }
+  }, [videosList, currentVideo]);
   const [downloadedIds, setDownloadedIds] = useState<string[]>([]);
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);

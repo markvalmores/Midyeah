@@ -62,6 +62,16 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isGroupMember, setIsGroupMember] = useState(false);
 
+  // Keep reactions and views counts in sync when the video prop is updated in real-time
+  useEffect(() => {
+    if (video.reactions) {
+      setReactCounts(video.reactions);
+    }
+    if (video.views !== undefined) {
+      setViewsCount(video.views);
+    }
+  }, [video]);
+
   const [aiSubtitles, setAiSubtitles] = useState<VideoSub[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<string>("");
   const [showSettings, setShowSettings] = useState(false);
@@ -508,7 +518,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   };
 
   // Progress Percentage for like vs dislike indicators
-  const likeRatio = hasRated === "like" ? 82 : hasRated === "dislike" ? 42 : 68;
+  const totalLikesDislikes = (video.likes || 0) + (video.dislikes || 0);
+  const likeRatio = totalLikesDislikes > 0 
+    ? Math.round(((video.likes || 0) / totalLikesDislikes) * 100) 
+    : 100;
 
   // Double Tap Seek for Mobile/Desktop Simulation
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -989,21 +1002,25 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
           {/* Likes & Dislikes Percentage Grid */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 overflow-hidden">
+            <div className="flex items-center bg-[#18181b] border border-white/10 rounded-xl p-0.5 overflow-hidden">
               <button
                 onClick={() => handleLikeDislike("like")}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded hover:bg-slate-800 transition cursor-pointer ${hasRated === "like" ? "text-purple-400 font-semibold" : "text-gray-300"}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition duration-150 cursor-pointer ${hasRated === "like" ? "text-purple-400 font-bold bg-purple-500/10 border border-purple-500/20" : "text-gray-300"}`}
                 id="rate-like-btn"
+                title={`${video.likes || 0} Likes`}
               >
-                <ThumbsUp className="w-3.5 h-3.5" /> {hasRated === "like" ? "Liked" : "Like"}
+                <ThumbsUp className="w-3.5 h-3.5" />
+                <span className="text-xs">{video.likes || 0}</span>
               </button>
-              <div className="h-4 w-px bg-slate-800"></div>
+              <div className="h-4 w-px bg-white/10 mx-0.5"></div>
               <button
                 onClick={() => handleLikeDislike("dislike")}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded hover:bg-slate-800 transition cursor-pointer ${hasRated === "dislike" ? "text-rose-400 font-semibold" : "text-gray-300"}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition duration-150 cursor-pointer ${hasRated === "dislike" ? "text-rose-400 font-bold bg-rose-500/10 border border-rose-500/20" : "text-gray-300"}`}
                 id="rate-dislike-btn"
+                title={`${video.dislikes || 0} Dislikes`}
               >
                 <ThumbsDown className="w-3.5 h-3.5" />
+                <span className="text-xs">{video.dislikes || 0}</span>
               </button>
             </div>
             
