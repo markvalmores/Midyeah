@@ -2288,7 +2288,6 @@ export default function App() {
                       onSwitchTab={setActiveTab} 
                     />
                   ) : null}
-                  {activeTab === "playlists" && console.log("Rendering PlaylistsTab, but did not render component")}
 
                   {activeTab === "support" && (
                     <SupportTab currUser={currUser} />

@@ -123,8 +123,7 @@ export default function PlaylistsTab({ currUser, videosList, onPlayVideo, onSwit
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 min-h-[450px] bg-red-500">
-      <div className="border border-white">HELLO</div>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 min-h-[450px]">
       {/* 2. LEFT SIDEBAR/DRAWER: Playlists Listing */}
       <div className="md:col-span-1 bg-[#121214] border border-white/15 rounded-3xl p-4 flex flex-col justify-between space-y-4">
         <div>
