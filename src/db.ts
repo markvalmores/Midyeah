@@ -115,7 +115,7 @@ async function validateConnection() {
 validateConnection();
 
 // IndexedDB fallbacks for high-fidelity offline downloads
-const DB_NAME = "MidyeahDB";
+const DB_NAME = "MidYeahDB";
 const DB_VERSION = 3;
 
 export async function openDB(): Promise<IDBDatabase> {

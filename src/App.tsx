@@ -106,6 +106,17 @@ export default function App() {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
 
+  const handleNextVideo = () => {
+    if (!currentVideo || videosList.length === 0) return;
+    const currentIndex = videosList.findIndex(v => v.id === currentVideo.id);
+    if (currentIndex !== -1 && currentIndex < videosList.length - 1) {
+      handlePlayVideo(videosList[currentIndex + 1]);
+    } else {
+      // Loop back to start
+      handlePlayVideo(videosList[0]);
+    }
+  };
+
   // Sync / Stream Video from Firestore chunks globally
   const handlePlayVideo = async (vid: Video) => {
     if (vid.isOffline || vid.blob || vid.videoUrl.startsWith("blob:") || vid.videoUrl.startsWith("data:")) {
@@ -958,7 +969,7 @@ export default function App() {
               </div>
 
               <div className="text-center mt-4">
-                <h2 className="text-lg font-black text-white">Join Midyeah Platform</h2>
+                <h2 className="text-lg font-black text-white">Join MidYeah Platform</h2>
                 <p className="text-[10px] text-purple-400 uppercase tracking-widest font-semibold mt-0.5">Please register your account safely</p>
               </div>
 
@@ -986,7 +997,7 @@ export default function App() {
               </form>
 
               <div className="mt-4 text-center border-t border-purple-950 pt-3">
-                <span className="text-[9px] text-gray-400 font-medium">Midyeah checks your credential security • God Bless</span>
+                <span className="text-[9px] text-gray-400 font-medium">MidYeah checks your credential security • God Bless</span>
               </div>
             </motion.div>
           )}
@@ -1358,6 +1369,7 @@ export default function App() {
                               onSaveToLibrary={handleSaveToMidyeahLibrary}
                               isDownloaded={downloadedIds.includes(currentVideo.id)}
                               onSetTab={(tab) => setActiveTab(tab as any)}
+                              onNext={handleNextVideo}
                             />
 
                             {/* PUBLIC COMMENTS SECTION - YouTube styled */}
@@ -1442,7 +1454,7 @@ export default function App() {
                         <div className="bg-gradient-to-br from-[#1C1C1F] via-[#121214] to-black border border-white/10 rounded-3xl p-6 relative overflow-hidden select-none">
                           <div className="absolute right-6 top-1/2 transform -translate-y-1/2 text-8xl opacity-[0.03]">🐰</div>
                           <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-                            <span>Welcome to Midyeah Platform Room!</span>
+                            <span>Welcome to MidYeah Platform Room!</span>
                             <Sparkles className="w-5 h-5 text-purple-400 animate-pulse" />
                           </h2>
                           <p className="text-xs text-slate-300 max-w-lg mt-1.5 leading-relaxed">
@@ -1556,7 +1568,7 @@ export default function App() {
                           <p className="text-[10px] text-purple-300 mt-1 max-w-sm mx-auto leading-relaxed">
                             {offlineMode
                               ? "You are currently playing in Offline viewing mode. Go back online and click save on release items to cache them local!"
-                              : "Midyeah starts clean with no streams. Toggle 'Creator view' on the top right header to upload and persist your first MP4!"}
+                              : "MidYeah starts clean with no streams. Toggle 'Creator view' on the top right header to upload and persist your first MP4!"}
                           </p>
                           {!offlineMode && (
                             <button

@@ -6,6 +6,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, Minimize2,
+  FastForward, SkipForward, SkipBack, Square, Settings2,
   Tv, Subtitles, Compass, RefreshCw, ThumbsUp, ThumbsDown, Share2,
   Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast, FolderHeart
 } from "lucide-react";
@@ -20,10 +21,11 @@ interface VideoPlayerProps {
   onSaveToLibrary: (v: Video) => void;
   isDownloaded: boolean;
   onVideoEnd?: () => void;
+  onNext?: () => void;
   onSetTab?: (tab: string) => void;
 }
 
-export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd, onSetTab }: VideoPlayerProps) {
+export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd, onNext, onSetTab }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,6 +64,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   // Subtitles generator (generates AI voice-over guess captions based on video criteria)
   const [aiSubtitles, setAiSubtitles] = useState<VideoSub[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<string>("");
+  const [showSettings, setShowSettings] = useState(false);
 
   // Resume Watch persistence
   useEffect(() => {
@@ -96,7 +99,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     // Generate AI Subtitles dynamically based on video details
     const words = [
       "Hello creative viewers!",
-      "Welcome to this exciting Midyeah presentation ☕",
+      "Welcome to this exciting MidYeah presentation ☕",
       "We strictly ensure a joyful and safe platform for watching.",
       "The Purpe Bunny mascot Midy is holding coffee right now!",
       "Be comfortable, lay back and let's explore.",
@@ -291,6 +294,20 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     }
   };
 
+  const skipTime = (amount: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
+    }
+  };
+
+  const handleStop = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+      setIsPlaying(false);
+    }
+  };
+
   const triggerResetRefresh = () => {
     setCrashState(false);
     if (videoRef.current) {
@@ -475,8 +492,9 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
         {showSubtitles && activeSubtitle && !crashState && (
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 bg-black/80 px-4 py-1.5 rounded-lg border border-purple-500/20 shadow text-center max-w-[85%] z-20 pointer-events-none transition-all">
             <p className="text-yellow-300 text-xs font-semibold tracking-wide flex items-center gap-1">
-              <span>{isAiSubtitle ? "✨ Auto AI Subtitle: " : "Subtitles: "}</span>
+              <span>{isAiSubtitle ? "✨ AI Listening & Transcribing: " : "Subtitles: "}</span>
               <span className="text-white font-normal">{activeSubtitle}</span>
+              {isAiSubtitle && <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="inline-block w-1.5 h-1.5 bg-yellow-400 rounded-full ml-1" />}
             </p>
           </div>
         )}
@@ -523,11 +541,48 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
               <button onClick={togglePlay} className="hover:text-purple-400 transition cursor-pointer" id="btn-play-pause">
                 {isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white" />}
               </button>
+
+              <button
+                onClick={handleStop}
+                className="hover:text-purple-400 transition cursor-pointer"
+                id="btn-stop-vid"
+                title="Stop & Reset"
+              >
+                <Square className="w-4 h-4 fill-white/20" />
+              </button>
+
+              <button
+                onClick={() => skipTime(-10)}
+                className="hover:text-purple-400 transition cursor-pointer"
+                id="btn-back-10"
+                title="Back 10s"
+              >
+                <SkipBack className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => skipTime(10)}
+                className="hover:text-purple-400 transition cursor-pointer"
+                id="btn-forward-10"
+                title="Forward 10s"
+              >
+                <SkipForward className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={onNext}
+                className="hover:text-purple-400 transition cursor-pointer"
+                id="btn-next-vid"
+                title="Next Video"
+              >
+                <FastForward className="w-4 h-4" />
+              </button>
               
               <button
                 onClick={() => { if (videoRef.current) videoRef.current.currentTime = 0; }}
                 className="hover:text-purple-400 transition cursor-pointer"
                 id="btn-restart-vid"
+                title="Restart"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
@@ -557,37 +612,45 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Speed Toggle */}
-              <div className="flex items-center gap-1">
-                {[0.5, 1, 1.5, 2].map((rate) => (
-                  <button
-                    key={rate}
-                    onClick={() => setPlaybackRate(rate)}
-                    className={`text-[9px] font-bold py-0.5 px-1 rounded transition cursor-pointer ${playbackRate === rate ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-200"}`}                
-                    id={`speed-${rate}`}
-                  >
-                    {rate}x
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-3 relative">
+              {/* Settings Dropdown Emulation */}
+              {showSettings && (
+                <div className="absolute bottom-full right-0 mb-2 bg-[#1C1C1F] border border-white/10 rounded-xl p-3 shadow-2xl min-w-[160px] flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 z-50">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-1">Playback Speed</span>
+                    <div className="grid grid-cols-2 gap-1 px-1">
+                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                        <button
+                          key={rate}
+                          onClick={() => { setPlaybackRate(rate); setShowSettings(false); }}
+                          className={`text-[10px] font-bold py-1 px-2 rounded-lg transition text-center ${playbackRate === rate ? "bg-purple-600 text-white" : "bg-white/5 text-gray-400 hover:bg-white/10"}`}
+                        >
+                          {rate}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="h-px bg-white/5 mx-1" />
+                  <div className="flex flex-col gap-2 px-1">
+                     <label className="flex items-center justify-between cursor-pointer group">
+                        <span className="text-[10px] text-gray-300 font-medium group-hover:text-white transition">Loop Video</span>
+                        <input type="checkbox" checked={isLoop} onChange={() => setIsLoop(!isLoop)} className="w-3 h-3 accent-purple-500 rounded bg-slate-800" />
+                     </label>
+                     <label className="flex items-center justify-between cursor-pointer group">
+                        <span className="text-[10px] text-gray-300 font-medium group-hover:text-white transition">Auto-play Next</span>
+                        <input type="checkbox" checked={isAutoplay} onChange={() => setIsAutoplay(!isAutoplay)} className="w-3 h-3 accent-purple-500 rounded bg-slate-800" />
+                     </label>
+                  </div>
+                </div>
+              )}
 
-              {/* Loop Toggle */}
               <button
-                onClick={() => setIsLoop(!isLoop)}
-                className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold transition cursor-pointer ${isLoop ? "bg-purple-600 text-white border border-purple-400" : "text-gray-400 hover:text-gray-200"}`}
-                id="toggle-loop"
+                onClick={() => setShowSettings(!showSettings)}
+                className={`hover:text-purple-400 transition cursor-pointer p-1 rounded-full ${showSettings ? "bg-white/10 text-purple-400" : "text-gray-400"}`}
+                id="btn-settings-toggle"
+                title="Playback Settings"
               >
-                Loop
-              </button>
-
-              {/* Autoplay Toggle */}
-              <button
-                onClick={() => setIsAutoplay(!isAutoplay)}
-                className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold transition cursor-pointer ${isAutoplay ? "bg-purple-600 text-white border border-purple-400" : "text-gray-400 hover:text-gray-200"}`}
-                id="toggle-autoplay"
-              >
-                Autoplay
+                <Settings2 className="w-5 h-5" />
               </button>
 
               {/* Subtitles (CC) Toggle */}
