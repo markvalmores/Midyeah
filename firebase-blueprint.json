@@ -145,6 +145,17 @@
         "timestamp": { "type": "string", "description": "ISO calendar snapshot" }
       },
       "required": ["userId", "videoId", "type", "timestamp"]
+    },
+    "UsageTracker": {
+      "title": "UsageTracker",
+      "description": "Tracks session duration on MidYeah",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User email" },
+        "totalSeconds": { "type": "integer", "description": "Total usage duration in seconds" },
+        "lastActive": { "type": "string", "description": "Last ISO timestamp of activity" }
+      },
+      "required": ["userId", "totalSeconds", "lastActive"]
     }
   },
   "firestore": {
@@ -190,6 +201,10 @@
     "/video_reactions/{reactId}": {
       "schema": "VideoReaction",
       "description": "Persistent record keeping user specific social reaction emojis"
+    },
+    "/usage_trackers/{email}": {
+      "schema": "UsageTracker",
+      "description": "Tracks total time usage on MidYeah"
     }
   }
 }

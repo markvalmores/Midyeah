@@ -15,12 +15,13 @@ import { subscribeToSubscribersCount, isGuestAccount, checkProfileUniqueness } f
 interface ProfileProps {
   profile: UserProfile;
   userVideos: Video[];
+  usageTracker?: number | null;
   onUpdate: (updated: UserProfile) => void;
   onLogOut?: () => void;
   onDeleteAccount?: () => void;
 }
 
-export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDeleteAccount }: ProfileProps) {
+export default function Profile({ profile, userVideos, usageTracker, onUpdate, onLogOut, onDeleteAccount }: ProfileProps) {
   const [username, setUsername] = useState(profile.username);
   const [channelName, setChannelName] = useState(profile.channelName);
   const [channelUrl, setChannelUrl] = useState(profile.channelUrl);
@@ -359,6 +360,12 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
               {isPartnerApproved && <CheckCircle className="w-4 h-4 text-purple-400 fill-purple-950" />}
             </h1>
             <p className="text-xs text-purple-300 font-mono">@{channelUrl || "midyeah_url"}</p>
+            
+            {usageTracker !== undefined && (
+              <div className="mt-2 p-2 bg-purple-950/30 rounded-xl border border-purple-900/50 text-[9px] text-purple-200 font-mono">
+                Total Usage: {Math.floor((usageTracker || 0) / 3600)}h {Math.floor(((usageTracker || 0) % 3600) / 60)}m
+              </div>
+            )}
             
             <button
               type="button"

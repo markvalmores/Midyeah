@@ -7,17 +7,18 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles, Youtube, ExternalLink,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
-  Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search, Info, MonitorPlay
+  Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search, Info, MonitorPlay, Award
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getRandomAnimeAvatar } from "./utils";
 
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { Video, UserProfile, Comment, Playlist } from "./types";
 import { 
   subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
   getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount,
-  subscribeVideoComments, getProfileByUsername, isGuestAccount, isAdminAccount
+  subscribeVideoComments, getProfileByUsername, isGuestAccount, isAdminAccount, db
 } from "./db";
 
 import Mascot from "./components/Mascot";
@@ -40,9 +41,8 @@ import { RentalPayment } from "./components/RentalPayment";
 import MembersPlusPage from "./components/MembersPlusPage";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus">("home");
   const [isCreatorMode, setIsCreatorMode] = useState(false); // Switch between Watcher and Creator mode
-  const [isMembersPlusMode, setIsMembersPlusMode] = useState(false); // Members+ Mode
   const [offlineMode, setOfflineMode] = useState(false); // Offline-Viewing only downloaded videos
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
   const [dedicatedProfileUser, setDedicatedProfileUser] = useState<UserProfile | null>(null);
@@ -51,6 +51,9 @@ export default function App() {
   // Custom User Playlists
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
   const [playlistDropdownForVid, setPlaylistDropdownForVid] = useState<string | null>(null);
+  
+  // Usage tracking
+  const [usageTracker, setUsageTracker] = useState<number | null>(null);
 
   // Authentications
   const [currUser, setCurrUser] = useState<UserProfile | null>(null);
@@ -100,6 +103,49 @@ export default function App() {
   useEffect(() => {
     currUserRef.current = currUser;
   }, [currUser]);
+
+  useEffect(() => {
+    async function fetchUsage() {
+      if (currUser?.email) {
+        const docRef = doc(db, "usage_trackers", currUser.email);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUsageTracker(docSnap.data().totalSeconds);
+        }
+      }
+    }
+    fetchUsage();
+  }, [currUser?.email]);
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    if (stepAuth === "loggedIn" && currUser?.email) {
+      intervalId = setInterval(async () => {
+        const trackerRef = doc(db, "usage_trackers", currUser.email);
+        const trackerSnap = await getDoc(trackerRef);
+        
+        if (trackerSnap.exists()) {
+          const newData = {
+            totalSeconds: trackerSnap.data().totalSeconds + 60,
+            lastActive: new Date().toISOString()
+          };
+          await updateDoc(trackerRef, newData);
+          setUsageTracker(newData.totalSeconds);
+        } else {
+          const newData = {
+            userId: currUser.email,
+            totalSeconds: 60,
+            lastActive: new Date().toISOString()
+          };
+          await setDoc(trackerRef, newData);
+          setUsageTracker(newData.totalSeconds);
+        }
+      }, 60000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [stepAuth, currUser?.email]);
 
   // Listen to pathname changes for dynamic public profile URL routing
   useEffect(() => {
@@ -1111,15 +1157,15 @@ export default function App() {
               <span className="hidden md:inline">Videos</span>
             </button>
             <button
-              onClick={() => { setIsMembersPlusMode(true); setActiveTab("home"); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${isMembersPlusMode ? "bg-yellow-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              onClick={() => { setActiveTab("membersPlus"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "membersPlus" ? "bg-yellow-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-members-plus"
             >
               <Award className="w-4 h-4" />
               <span className="hidden sm:inline">Members+</span>
             </button>
             <button
-              onClick={() => { setActiveTab("search"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); setIsMembersPlusMode(false); }}
+              onClick={() => { setActiveTab("search"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "search" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-search"
             >
@@ -2236,6 +2282,7 @@ export default function App() {
                   <Profile 
                     profile={currUser} 
                     userVideos={videosList.filter(v => v.creator.email === currUser.email)}
+                    usageTracker={usageTracker}
                     onUpdate={handleProfileUpdate} 
                     onLogOut={handleLogOut} 
                     onDeleteAccount={handleDeleteAccount} 
@@ -2250,9 +2297,9 @@ export default function App() {
 
         </AnimatePresence>
 
-        {isMembersPlusMode && currUser && (
+        {/* {isMembersPlusMode && currUser && (
           <MembersPlusPage currUser={currUser} creatorProfile={currUser} />
-        )}
+        )} */}
       </motion.main>
 
       {/* 3. HARDWARE CONSOLE HANDHELD CONTROLLER STYLE SHEETS */}

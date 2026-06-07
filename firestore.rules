@@ -89,6 +89,12 @@ service cloud.firestore {
           && data.type is string && data.type.size() <= 100;
     }
 
+    function isValidUsageTracker(data) {
+      return data.userId is string && data.userId.size() <= 128
+          && data.totalSeconds is int
+          && data.lastActive is string;
+    }
+
     function isGuest() {
       return isSignedIn() && request.auth.token.email == "guest@midyeah.com";
     }
@@ -254,6 +260,12 @@ service cloud.firestore {
     match /members_plus_settings/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && !isGuest() && (request.auth.token.email == userId);
+    }
+
+    // 18. User Usage Tracker
+    match /usage_trackers/{email} {
+      allow read: if isOwner(email);
+      allow write: if isOwner(email) && isValidUsageTracker(request.resource.data);
     }
 
   }
