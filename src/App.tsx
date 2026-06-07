@@ -42,11 +42,11 @@ import MembersPlusPage from "./components/MembersPlusPage";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus">(() => {
-    return (localStorage.getItem("midyeah_active_tab") as any) || "home";
+    return (localStorage.getItem("midyeah_active_tab_v2") as any) || "home";
   });
 
   useEffect(() => {
-    localStorage.setItem("midyeah_active_tab", activeTab);
+    localStorage.setItem("midyeah_active_tab_v2", activeTab);
   }, [activeTab]);
   const [isCreatorMode, setIsCreatorMode] = useState(false); // Switch between Watcher and Creator mode
   const [offlineMode, setOfflineMode] = useState(false); // Offline-Viewing only downloaded videos
@@ -2262,14 +2262,15 @@ export default function App() {
 
                   {activeTab === "radio" && <RadioPlayer />}
 
-                  {activeTab === "playlists" && (
+                  {activeTab === "playlists" ? (
                     <PlaylistsTab 
                       currUser={currUser} 
                       videosList={videosList} 
                       onPlayVideo={(vid) => { handlePlayVideo(vid); }} 
                       onSwitchTab={setActiveTab} 
                     />
-                  )}
+                  ) : null}
+                  {activeTab === "playlists" && console.log("Rendering PlaylistsTab, but did not render component")}
 
                   {activeTab === "support" && (
                     <SupportTab currUser={currUser} />
