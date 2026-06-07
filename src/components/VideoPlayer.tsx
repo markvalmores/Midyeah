@@ -8,7 +8,7 @@ import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, Minimize2,
   FastForward, SkipForward, SkipBack, Square, Settings2,
   Tv, Subtitles, Compass, RefreshCw, ThumbsUp, ThumbsDown, Share2,
-  Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast, FolderHeart
+  Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast, FolderHeart, WifiOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Video, VideoSub, UserProfile } from "../types";
@@ -335,6 +335,36 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     }
   };
 
+  const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let url: string | null = null;
+    if (video.blob) {
+      url = URL.createObjectURL(video.blob);
+      setVideoBlobUrl(url);
+    } else {
+      setVideoBlobUrl(null);
+    }
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [video]);
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   const togglePlay = () => {
     if (crashState) return;
     if (videoRef.current) {
@@ -628,15 +658,29 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
           </div>
         ) : video.source === "youtube" ? (
           /* YouTube Embed Player */
-          <iframe
-            src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
-            title={video.title}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            className="w-full h-full z-10"
-            onLoad={() => setIsPlaying(true)}
-          />
+          isOnline ? (
+            <iframe
+              src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
+              title={video.title}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="w-full h-full z-10"
+              onLoad={() => setIsPlaying(true)}
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[#0a0a0c] z-10 p-6 text-center">
+              <WifiOff className="w-12 h-12 text-rose-500 mb-4 opacity-80" />
+              <h2 className="text-xl font-bold text-white mb-2 tracking-tight">You are Offline</h2>
+              <p className="text-sm text-gray-400 max-w-md bg-white/5 p-4 rounded-xl border border-white/10">
+                You're trying to watch a YouTube video, but you are not connected to the internet. 
+                <br /><br />
+                <span className="text-rose-400 font-semibold">Note:</span> Because YouTube blocks external video downloading to protect creators, their videos cannot be physically stored onto your device for offline playback.
+                <br /><br />
+                To watch offline without internet, you or the creator must upload the actual video file natively to MidYeah.
+              </p>
+            </div>
+          )
         ) : video.is360 ? (
           /* 360 VR Canvas Sphere Projector */
           <canvas
@@ -654,7 +698,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
         {/* Underlying Core Video Node (Hidden if is360 is true and Canvas is active overlay) */}
         <video
           ref={videoRef}
-          src={video.videoUrl}
+          src={videoBlobUrl || video.videoUrl}
           referrerPolicy="no-referrer"
           preload="auto"
           loop={isLoop}

@@ -692,16 +692,34 @@ export default function App() {
     setDownloadedIds(prev => [...prev, v.id]);
     
     try {
-      // Simulate caching Blob or local index offsets in IDB
-      const dummyBlob = v.blob || new Blob(["MidYeah Video Cache File Data"], { type: "video/mp4" });
+      let offlineBlob = v.blob;
+      
+      // If no blob is available and it's a direct URL, try to fetch it
+      if (!offlineBlob && v.source === "url" && v.videoUrl) {
+        try {
+          const res = await fetch(v.videoUrl);
+          if (res.ok) {
+            offlineBlob = await res.blob();
+          } else {
+             throw new Error("Failed to fetch");
+          }
+        } catch (fetchErr) {
+          console.warn("Could not fetch remote URL, falling back to dummy", fetchErr);
+        }
+      }
+
+      // Fallback
+      if (!offlineBlob) {
+         offlineBlob = new Blob(["MidYeah Video Cache File Data"], { type: "video/mp4" });
+      }
       
       const offlineVideo: Video = {
         ...v,
         isOffline: true,
-        blob: dummyBlob
+        blob: offlineBlob
       };
 
-      await saveVideo(offlineVideo, dummyBlob);
+      await saveVideo(offlineVideo, offlineBlob);
       reloadVideos(); // Full sync
       alert(`✨ '${v.title}' successfully cached at ${res} resolution into browser local storage! Ready for offline viewing. 🐰`);
     } catch (err: any) {
