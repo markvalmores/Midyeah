@@ -34,9 +34,10 @@ import SupportTab from "./components/SupportTab";
 import SearchTab from "./components/SearchTab";
 import DedicatedProfilePage from "./components/DedicatedProfilePage";
 import WatchSection from "./components/WatchSection";
+import YoutubePortal from "./components/YoutubePortal";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube">("home");
   const [isCreatorMode, setIsCreatorMode] = useState(false); // Switch between Watcher and Creator mode
   const [offlineMode, setOfflineMode] = useState(false); // Offline-Viewing only downloaded videos
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
@@ -1030,6 +1031,14 @@ export default function App() {
             >
               <MonitorPlay className="w-4 h-4 text-purple-300" />
               <span className="hidden sm:inline">Watch Section 🍥</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab("youtube"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition ${activeTab === "youtube" ? "bg-red-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              id="nav-tab-youtube"
+            >
+              <Youtube className="w-4 h-4 text-red-400 animate-pulse" />
+              <span className="hidden sm:inline">Watch on YouTube 📺</span>
             </button>
             <button
               onClick={() => { setActiveTab("radio"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
@@ -2055,6 +2064,8 @@ export default function App() {
                   {activeTab === "rooms" && <WatchRoom />}
 
                   {activeTab === "watch" && <WatchSection />}
+
+                  {activeTab === "youtube" && <YoutubePortal />}
 
                   {activeTab === "search" && (
                     <SearchTab 

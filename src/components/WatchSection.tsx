@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
-  Tv, ExternalLink, Sparkles, Play, RefreshCw, Info, Heart, Gift, MonitorPlay, Film, ArrowUpRight
+  Tv, ExternalLink, Sparkles, Play, RefreshCw, Info, Heart, Gift, MonitorPlay, Film, ArrowUpRight, Image as ImageIcon
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -16,11 +16,18 @@ interface AnimeServer {
   description: string;
   tags: string[];
   recommendedStyle: string;
-  avatarPlaceholder: string;
+  defaultImage: string;
+  apiEndpoint: string;
 }
 
 export default function WatchSection() {
   const [activeServer, setActiveServer] = useState<string | null>(null);
+  const [serverImages, setServerImages] = useState<Record<string, string>>({
+    server1: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=400&q=80",
+    server2: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=400&q=80",
+    server3: "https://images.unsplash.com/photo-1541562232579-512a21360020?auto=format&fit=crop&w=400&q=80"
+  });
+  const [isLoadingImages, setIsLoadingImages] = useState<Record<string, boolean>>({});
 
   const animeServers: AnimeServer[] = [
     {
@@ -30,7 +37,8 @@ export default function WatchSection() {
       description: "Fast-loading, high-quality anime database featuring the latest series and subbed releases. One of the cleanest streaming directories.",
       tags: ["High Quality", "Fast Load", "Subbed"],
       recommendedStyle: "from-indigo-600 to-cyan-500 shadow-indigo-500/20",
-      avatarPlaceholder: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=400&q=80"
+      defaultImage: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=400&q=80",
+      apiEndpoint: "https://api.waifu.pics/sfw/waifu"
     },
     {
       id: "server2",
@@ -39,7 +47,8 @@ export default function WatchSection() {
       description: "Alternative fast delivery server node optimized for smooth bandwidth and seamless playback experience. Packed with library archives.",
       tags: ["Alt Node", "Optimized", "Huge Library"],
       recommendedStyle: "from-purple-600 to-pink-500 shadow-purple-500/20",
-      avatarPlaceholder: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=400&q=80"
+      defaultImage: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=400&q=80",
+      apiEndpoint: "https://api.waifu.pics/sfw/neko"
     },
     {
       id: "server3",
@@ -48,9 +57,33 @@ export default function WatchSection() {
       description: "Official Muse Asia YouTube Channel. Enjoy fully license-cleared anime streams, free of ads (with YT Premium) and completely legal!",
       tags: ["Official YouTube", "100% Legal", "Community"],
       recommendedStyle: "from-red-600 to-rose-500 shadow-rose-500/20",
-      avatarPlaceholder: "https://images.unsplash.com/photo-1541562232579-512a21360020?auto=format&fit=crop&w=400&q=80"
+      defaultImage: "https://images.unsplash.com/photo-1541562232579-512a21360020?auto=format&fit=crop&w=400&q=80",
+      apiEndpoint: "https://api.waifu.pics/sfw/shinobu"
     }
   ];
+
+  const fetchImageForServer = async (serverId: string, endpoint: string) => {
+    setIsLoadingImages(prev => ({ ...prev, [serverId]: true }));
+    try {
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error("API issue");
+      const data = await response.json();
+      if (data && data.url) {
+        setServerImages(prev => ({ ...prev, [serverId]: data.url }));
+      }
+    } catch (error) {
+      console.warn(`Failed to fetch image from Anime SFW API for ${serverId}, keeping current banner artwork`, error);
+    } finally {
+      setIsLoadingImages(prev => ({ ...prev, [serverId]: false }));
+    }
+  };
+
+  // On mount, load all 3 anime images dynamically from Server Anime API endpoints
+  useEffect(() => {
+    animeServers.forEach(server => {
+      fetchImageForServer(server.id, server.apiEndpoint);
+    });
+  }, []);
 
   const handleLaunchServer = (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
@@ -106,17 +139,36 @@ export default function WatchSection() {
             
             <div className="space-y-4">
               {/* Cover Art Image Header */}
-              <div className="relative h-40 w-full rounded-xl overflow-hidden border border-white/10 group-hover:border-purple-500/20 transition-all">
-                <img 
-                  src={server.avatarPlaceholder} 
-                  alt={server.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-3">
+              <div className="relative h-40 w-full rounded-xl overflow-hidden border border-white/10 group-hover:border-purple-500/20 transition-all bg-[#0a0a0f]">
+                {isLoadingImages[server.id] ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-purple-950/20">
+                    <RefreshCw className="w-6 h-6 text-purple-400 animate-spin" />
+                    <span className="text-[9px] font-mono text-purple-300 mt-2 uppercase tracking-wide">Loading API Cover...</span>
+                  </div>
+                ) : (
+                  <img 
+                    src={serverImages[server.id] || server.defaultImage} 
+                    alt={server.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent flex flex-col justify-between p-3">
+                  <div className="flex justify-end">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fetchImageForServer(server.id, server.apiEndpoint);
+                      }}
+                      className="p-1.5 rounded-lg bg-black/60 hover:bg-purple-600 border border-white/10 text-white cursor-pointer transition-all active:scale-95"
+                      title="Fetch dynamic Anime SFW API cover photo"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingImages[server.id] ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
                   <div className="flex items-center gap-2">
                     {server.tags.map((tag, tIdx) => (
-                      <span key={tIdx} className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-purple-300 bg-purple-950/80 border border-purple-500/40 px-1.5 py-0.5 rounded-full uppercase">
+                      <span key={tIdx} className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-purple-200 bg-purple-950/90 border border-purple-500/40 px-1.5 py-0.5 rounded-full uppercase">
                         {tag}
                       </span>
                     ))}
@@ -130,7 +182,10 @@ export default function WatchSection() {
                   <h3 className="text-lg font-black text-white group-hover:text-purple-300 transition duration-150 uppercase tracking-tight">
                     {server.name}
                   </h3>
-                  <span className="text-[10px] font-mono text-gray-500 uppercase">SERVER STATE: ONLINE</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[9px] font-mono text-gray-400 uppercase">STATE: ONLINE</span>
+                  </div>
                 </div>
                 <p className="text-gray-400 text-xs leading-relaxed min-h-[48px]">
                   {server.description}
