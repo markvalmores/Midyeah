@@ -971,7 +971,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* Brand Mascot layout area */}
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setActiveTab("home"); setCurrentVideo(null); }}>
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setActiveTab("home"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}>
           <div className="h-9 w-9 bg-purple-600 rounded-full flex items-center justify-center border-2 border-purple-400 font-bold text-white shadow-lg shadow-purple-500/20">
             🐰
           </div>
@@ -985,7 +985,7 @@ export default function App() {
         {stepAuth === "loggedIn" && (
           <nav className="flex items-center gap-1 sm:gap-2">
             <button
-              onClick={() => { setActiveTab("home"); setCurrentVideo(null); }}
+              onClick={() => { setActiveTab("home"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "home" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-home"
             >
@@ -993,7 +993,7 @@ export default function App() {
               <span className="hidden md:inline">Videos</span>
             </button>
             <button
-              onClick={() => { setActiveTab("search"); setCurrentVideo(null); }}
+              onClick={() => { setActiveTab("search"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "search" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-search"
             >
@@ -1001,7 +1001,7 @@ export default function App() {
               <span className="hidden sm:inline">Search Space 🍥</span>
             </button>
             <button
-              onClick={() => { setActiveTab("rooms"); setCurrentVideo(null); }}
+              onClick={() => { setActiveTab("rooms"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "rooms" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-rooms"
             >
@@ -1009,7 +1009,7 @@ export default function App() {
               <span className="hidden md:inline">Watchrooms</span>
             </button>
             <button
-              onClick={() => { setActiveTab("radio"); setCurrentVideo(null); }}
+              onClick={() => { setActiveTab("radio"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "radio" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-radio"
             >
@@ -1017,7 +1017,7 @@ export default function App() {
               <span className="hidden md:inline">Radio</span>
             </button>
             <button
-              onClick={() => { setActiveTab("playlists"); setCurrentVideo(null); }}
+              onClick={() => { setActiveTab("playlists"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "playlists" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-playlists"
             >
@@ -1025,7 +1025,7 @@ export default function App() {
               <span className="hidden md:inline">Playlists</span>
             </button>
             <button
-              onClick={() => { setActiveTab("community"); setCurrentVideo(null); }}
+              onClick={() => { setActiveTab("community"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "community" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-community"
             >
@@ -1033,7 +1033,7 @@ export default function App() {
               <span className="hidden md:inline">Discord Circle</span>
             </button>
             <button
-              onClick={() => { setActiveTab("support"); setCurrentVideo(null); }}
+              onClick={() => { setActiveTab("support"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition ${activeTab === "support" ? "bg-rose-600 text-white shadow" : "text-rose-400 hover:text-rose-300"}`}
               id="nav-tab-support"
             >
@@ -1064,6 +1064,8 @@ export default function App() {
                 onClick={() => {
                   setIsCreatorMode(!isCreatorMode);
                   setCurrentVideo(null); // idle player
+                  setDedicatedProfileUser(null);
+                  window.history.pushState({}, "", "/");
                 }}
                 className={`text-[10px] font-bold px-2 py-1 border rounded-lg transition duration-200 cursor-pointer flex items-center gap-1 uppercase ${isCreatorMode ? "bg-rose-950 border-rose-600 text-rose-300" : "bg-purple-950 border-purple-800 text-purple-300"}`}
                 id="toggle-creator-watcher"
