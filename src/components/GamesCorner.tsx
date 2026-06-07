@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Gamepad2 } from 'lucide-react';
+import { Sword } from 'lucide-react';
 
 export default function GamesCorner() {
   const games = [
-    { title: "HTML5 Games", url: "https://html5games.com/" }
+    { title: "Granblue Fantasy", url: "https://steam.granbluefantasy.com/" }
   ];
   const [selectedGame, setSelectedGame] = useState(games[0]);
   const [zoom, setZoom] = useState(1);
@@ -12,7 +12,7 @@ export default function GamesCorner() {
     <div className="flex flex-col h-full bg-[#121214] p-2 gap-2">
       <div className="flex items-center gap-2 px-2 justify-between">
         <div className="flex items-center gap-2">
-          <Gamepad2 className="text-white" />
+          <Sword className="text-white" />
           <h2 className="text-xl text-white font-bold">Games Corner</h2>
         </div>
         <div className="flex items-center gap-2 text-white">
