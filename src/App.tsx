@@ -56,6 +56,12 @@ export default function App() {
   // Tutorial overlay
   const [showTutorial, setShowTutorial] = useState(false);
   const [isQuotaExhausted, setIsQuotaExhausted] = useState(!hasFirestoreQuota);
+  const [notification, setNotification] = useState<{message: string, show: boolean}>({message: "", show: false});
+
+  const showNotification = (msg: string) => {
+    setNotification({ message: msg, show: true });
+    setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 6000);
+  };
 
   useEffect(() => {
     // Periodically check the global quota flag
@@ -656,14 +662,16 @@ export default function App() {
         country: uploadCountry
       };
 
-      // Stage 3: Dynamic byte-stream compilation
-      setUploadProgress(70);
-      setUploadStage("Syncing to cloud...");
+      // Stage 3: Initializing sync
+      setUploadProgress(45);
+      setUploadStage("Readying upload...");
 
       // Run saveVideo and await completion
       await saveVideo(newVideo, uploadFile, (p) => {
-        setUploadProgress(p);
-        setUploadStage(`Syncing... ${p}%`);
+        // Map 0-100 to 45-100 range for smoother UI transitions
+        const mappedProgress = Math.floor(45 + (p * 0.55));
+        setUploadProgress(mappedProgress);
+        setUploadStage(p === 100 ? "Finalizing..." : `Syncing... ${p}%`);
       });
       
       // Update the videos list only AFTER successful save
@@ -674,7 +682,7 @@ export default function App() {
       setUploadStage("Completed!");
       
       // Show success notification bubble
-      alert("✨ Your post has been successful. God Bless.");
+      showNotification("✨ Your post has been successful. God Bless.");
       
       // Delay reset so user sees 100% completion
       setTimeout(() => {
@@ -858,6 +866,30 @@ export default function App() {
       {/* 1. TOP HEADER BANNER BAR */}
       <header className="sticky top-0 z-40 bg-[#121214]/90 border-b border-white/10 backdrop-blur-md px-6 py-4 flex items-center justify-between gap-4">
         
+        {/* NOTIFICATION TOAST BUBBLE */}
+        <AnimatePresence mode="wait">
+          {notification.show && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: -20, x: "-50%" }}
+              animate={{ opacity: 1, scale: 1, y: 0, x: "-50%" }}
+              exit={{ opacity: 0, scale: 0.8, y: -20, x: "-50%" }}
+              className="fixed top-24 left-1/2 z-[100] bg-purple-600 text-white px-6 py-3 rounded-2xl shadow-2xl border border-purple-400 font-bold flex items-center gap-3 min-w-[300px]"
+            >
+              <div className="bg-white/20 p-1.5 rounded-full">
+                <Check className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-sm">{notification.message}</p>
+              <button 
+                onClick={() => setNotification(prev => ({...prev, show: false}))} 
+                className="ml-auto opacity-60 hover:opacity-100 p-1"
+                id="close-notification-toast"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Brand Mascot layout area */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setActiveTab("home"); setCurrentVideo(null); }}>
           <div className="h-9 w-9 bg-purple-600 rounded-full flex items-center justify-center border-2 border-purple-400 font-bold text-white shadow-lg shadow-purple-500/20">

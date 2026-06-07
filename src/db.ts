@@ -60,6 +60,18 @@ export enum OperationType {
   WRITE = "write",
 }
 
+// TIMEOUT HELPER: Prevents UI hangs during slow Firestore sync
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("Operation timeout: Network or Quota issue"));
+    }, timeoutMs);
+  });
+  
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+}
+
 export interface FirestoreErrorInfo {
   error: string;
   operationType: OperationType;
@@ -224,15 +236,23 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
       let success = false;
       while (retries > 0 && !success) {
         try {
-          await setDoc(chunkDocRef, {
+          // Use timeout to prevent hanging the entire process
+          await withTimeout(setDoc(chunkDocRef, {
             index: i,
             data: chunkData
-          });
+          }), 15000); // 15s per chunk
           success = true;
         } catch (err: any) {
           retries--;
-          console.warn(`Chunk ${i} upload failed, retries left: ${retries}`, err);
-          if (retries === 0) throw err;
+          console.warn(`Chunk ${i} upload failed/timeout, retries left: ${retries}`, err);
+          if (retries === 0) {
+            // If quota likely hit or network died, just stop trying remotely but continue locally
+            if (err.message.includes("Quota") || err.message.includes("timeout")) {
+                hasFirestoreQuota = false; 
+                return; // Silently stop chunking but return cleanly
+            }
+            throw err;
+          }
           await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
         }
       }
@@ -531,11 +551,14 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
         let metaRetries = 2;
         while (metaRetries > 0) {
           try {
-            await setDoc(docRef, videoToSave);
+            await withTimeout(setDoc(docRef, videoToSave), 8000);
             break;
           } catch (err) {
             metaRetries--;
-            if (metaRetries === 0) throw err;
+            if (metaRetries === 0) {
+                hasFirestoreQuota = false;
+                break; // Fallback to local-only
+            }
             await new Promise(r => setTimeout(r, 800));
           }
         }
