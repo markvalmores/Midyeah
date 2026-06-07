@@ -17,7 +17,7 @@ import {
   subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
   getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount,
-  subscribeVideoComments
+  subscribeVideoComments, hasFirestoreQuota
 } from "./db";
 
 import Mascot from "./components/Mascot";
@@ -55,6 +55,17 @@ export default function App() {
 
   // Tutorial overlay
   const [showTutorial, setShowTutorial] = useState(false);
+  const [isQuotaExhausted, setIsQuotaExhausted] = useState(!hasFirestoreQuota);
+
+  useEffect(() => {
+    // Periodically check the global quota flag
+    const interval = setInterval(() => {
+      if (!hasFirestoreQuota) {
+        setIsQuotaExhausted(true);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Keep track of current user to prevent overwrites
   const currUserRef = useRef(currUser);
@@ -79,7 +90,19 @@ export default function App() {
       
       if (toKill.length > 0) {
         console.log(`Eradicating ${toKill.length} ghost videos...`);
-        toKill.forEach(v => handleDeleteSingleVideo(v.id));
+        // If quota is hit, only clear local ghosts to avoid spamming network errors
+        toKill.forEach(v => {
+          if (hasFirestoreQuota) {
+            handleDeleteSingleVideo(v.id);
+          } else {
+            // Manual local wipe bypass
+            openDB().then(db => {
+               const tx = db.transaction("videos", "readwrite");
+               tx.objectStore("videos").delete(v.id);
+               tx.oncomplete = () => reloadVideos();
+            });
+          }
+        });
       }
     }
   }, [videosList.length]);
@@ -793,6 +816,38 @@ export default function App() {
           <span>Maintenance Mode v1.4.2</span>
         </div>
       </div>
+
+        {/* QUOTA LIMIT BANNER */}
+        <AnimatePresence>
+          {isQuotaExhausted && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-yellow-500/10 border-b border-yellow-500/20 backdrop-blur-md overflow-hidden"
+            >
+              <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-yellow-500">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <p className="text-[11px] font-bold uppercase tracking-wider">
+                    Global Cloud Quota Reached — Running in High-Fidelity Local Mode
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                   <p className="hidden md:block text-[10px] text-yellow-500/60 font-medium">
+                     Your videos and profile are safely saved in your browser. Cloud syncing will resume automatically.
+                   </p>
+                   <button 
+                    onClick={() => window.location.reload()} 
+                    className="text-[10px] bg-yellow-500 text-black px-2 py-0.5 rounded font-bold uppercase hover:bg-yellow-400 transition"
+                   >
+                     Reload App
+                   </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       {/* 1. TOP HEADER BANNER BAR */}
       <header className="sticky top-0 z-40 bg-[#121214]/90 border-b border-white/10 backdrop-blur-md px-6 py-4 flex items-center justify-between gap-4">

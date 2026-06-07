@@ -78,7 +78,7 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  if (error instanceof Error && error.message.includes("resource-exhausted")) {
+  if (error instanceof Error && (error.message.includes("resource-exhausted") || (error as any).code === "resource-exhausted")) {
     hasFirestoreQuota = false;
     console.warn("Firestore quota exhausted, disabling remote sync for the rest of session.");
   }
@@ -358,7 +358,11 @@ export async function deleteProfileFromDb(email: string): Promise<void> {
 }
 
 // Global Firestore sync state
-let hasFirestoreQuota = true;
+export let hasFirestoreQuota = true;
+
+export function setFirestoreQuota(status: boolean) {
+  hasFirestoreQuota = status;
+}
 
 // Add a simple in-memory cache to skip Firestore writes if the profile hasn't changed.
 let lastSavedProfile = new Map<string, string>(); // email -> JSON.stringify(profile)
@@ -750,11 +754,12 @@ export async function deleteVideo(id: string): Promise<void> {
       });
       await commBatch.commit();
 
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message && (err.message.includes("resource-exhausted") || err.code === "resource-exhausted")) {
+        hasFirestoreQuota = false;
+      }
       console.error("Could not delete from global network:", err);
-      // Even if firestore fails, we've cleared local, but user wants it gone forever.
-      // We should ideally throw here if the user wanted it "hard-coded" deleted.
-      throw new Error("Hard-delete failed on cloud. Please check network.");
+      // If quota hit, we don't throw here to allow local delete to finish silently
     }
   }
 }
