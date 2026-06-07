@@ -467,8 +467,8 @@ export default function App() {
   // Hydrate and synchronize active Firebase Auth sessions
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      // Prevent profile reset if we already have a user
-      if (currUserRef.current) return;
+      // Prevent profile reset if we already have a real user (not a guest)
+      if (currUserRef.current && !isGuestAccount(currUserRef.current.email)) return;
 
       if (firebaseUser?.email && !isAdminAccount(firebaseUser.email)) {
         try {
@@ -483,7 +483,7 @@ export default function App() {
             const savedEmail = localStorage.getItem("midyeah_active_session_email");
             if (!savedEmail) {
               const [randomAvatar, count] = await Promise.all([getAnyAnimeAvatarUrl(), getUserCount()]);
-              const formattedIndex = count.toString().padStart(2, '0');
+              const formattedIndex = count.toString().padStart(2, "0");
               const prof: UserProfile = {
                 username: `midyeah_user_${formattedIndex}`,
                 email: firebaseUser.email,

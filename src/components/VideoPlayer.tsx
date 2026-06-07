@@ -61,8 +61,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
   // Reactions & views
   const [currentReact, setCurrentReact] = useState<string | null>(null);
-  const [reactCounts, setReactCounts] = useState(video.reactions);
-  const [viewsCount, setViewsCount] = useState(video.views);
+  const [reactCounts, setReactCounts] = useState(video.reactions || {});
+  const [viewsCount, setViewsCount] = useState(video.views || 0);
+  const [likesCount, setLikesCount] = useState(video.likes || 0);
+  const [dislikesCount, setDislikesCount] = useState(video.dislikes || 0);
   const [hasRated, setHasRated] = useState<"like" | "dislike" | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isGroupMember, setIsGroupMember] = useState(false);
@@ -75,32 +77,54 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     if (video.views !== undefined) {
       setViewsCount(video.views);
     }
+    if (video.likes !== undefined) {
+      setLikesCount(video.likes);
+    }
+    if (video.dislikes !== undefined) {
+      setDislikesCount(video.dislikes);
+    }
   }, [video]);
 
-  // Sync subscription and group membership status
+  // Sync all user-specific status (Subscription, Group, Likes, Reactions)
   useEffect(() => {
-    async function syncStatus() {
-      if (currUser && video && video.creator) {
-        try {
-          const subbed = await checkSubscriptionStatus(currUser.email, video.creator.email);
-          setIsSubscribed(subbed);
-          
-          const groupId = video.creator.channelUrl || "midyeah_group";
-          const joined = await checkGroupStatus(currUser.email, groupId);
-          setIsGroupMember(joined);
-
-          const rating = await getLikeDislikeStatus(currUser.email, video.id);
-          setHasRated(rating);
-        } catch (e) {
-          console.warn("Status check failed:", e);
+    async function syncAllStatus() {
+      // Resolve persistent user or client guest identifier
+      const userIdentifier = currUser?.email || (() => {
+        let localAnon = localStorage.getItem("midyeah_anon_user_id");
+        if (!localAnon) {
+          localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);
+          localStorage.setItem("midyeah_anon_user_id", localAnon);
         }
-      } else {
-        setIsSubscribed(false);
-        setIsGroupMember(false);
+        return localAnon;
+      })();
+
+      if (video && video.id) {
+        try {
+          // Fetch like/dislike status
+          const rating = await getLikeDislikeStatus(userIdentifier, video.id);
+          setHasRated(rating);
+
+          // Fetch video reactions
+          const reactType = await getVideoReactionStatus(userIdentifier, video.id);
+          setCurrentReact(reactType);
+
+          // If logged in, fetch creator-related status
+          if (currUser && video.creator) {
+            const subbed = await checkSubscriptionStatus(currUser.email, video.creator.email);
+            setIsSubscribed(subbed);
+            
+            const groupId = video.creator.channelUrl || "midyeah_group";
+            const joined = await checkGroupStatus(currUser.email, groupId);
+            setIsGroupMember(joined);
+          }
+        } catch (e) {
+          console.warn("Status synchronization failed:", e);
+        }
       }
     }
-    syncStatus();
-  }, [currUser, video]);
+
+    syncAllStatus();
+  }, [currUser, video.id]);
 
   const [aiSubtitles, setAiSubtitles] = useState<VideoSub[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<string>("");
@@ -130,30 +154,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     };
   }, [isPlaying, showSettings]);
 
-  // Resume Watch persistence
   useEffect(() => {
     setCrashState(false);
     setIsPlaying(false);
-    setCurrentReact(null);
-    setHasRated(null);
-
-    // Resolve persistent user or client guest identifier
-    const userIdentifier = currUser?.email || (() => {
-      let localAnon = localStorage.getItem("midyeah_anon_user_id");
-      if (!localAnon) {
-        localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);
-        localStorage.setItem("midyeah_anon_user_id", localAnon);
-      }
-      return localAnon;
-    })();
-
-    getLikeDislikeStatus(userIdentifier, video.id).then((status) => {
-      if (status) setHasRated(status);
-    });
-
-    getVideoReactionStatus(userIdentifier, video.id).then((reactType) => {
-      if (reactType) setCurrentReact(reactType);
-    });
+    // Do NOT reset hasRated or currentReact here to avoid flickering logic
 
     const updatedViews = (video.views || 0) + 1;
     setViewsCount(updatedViews); // Bump local UI view count optimistically
@@ -457,15 +461,30 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
     if (hasRated === type) {
       nextRated = null;
-      if (type === "like") newLikes = Math.max(0, newLikes - 1);
-      else newDislikes = Math.max(0, newDislikes - 1);
+      if (type === "like") {
+        newLikes = Math.max(0, newLikes - 1);
+        setLikesCount(prev => Math.max(0, prev - 1));
+      } else {
+        newDislikes = Math.max(0, newDislikes - 1);
+        setDislikesCount(prev => Math.max(0, prev - 1));
+      }
     } else {
-      if (hasRated === "like") newLikes = Math.max(0, newLikes - 1);
-      else if (hasRated === "dislike") newDislikes = Math.max(0, newDislikes - 1);
+      if (hasRated === "like") {
+        newLikes = Math.max(0, newLikes - 1);
+        setLikesCount(prev => Math.max(0, prev - 1));
+      } else if (hasRated === "dislike") {
+        newDislikes = Math.max(0, newDislikes - 1);
+        setDislikesCount(prev => Math.max(0, prev - 1));
+      }
       
       nextRated = type;
-      if (type === "like") newLikes++;
-      else newDislikes++;
+      if (type === "like") {
+        newLikes++;
+        setLikesCount(prev => prev + 1);
+      } else {
+        newDislikes++;
+        setDislikesCount(prev => prev + 1);
+      }
     }
     
     setHasRated(nextRated);
@@ -1037,20 +1056,20 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
                 onClick={() => handleLikeDislike("like")}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition duration-150 cursor-pointer ${hasRated === "like" ? "text-purple-400 font-bold bg-purple-500/10 border border-purple-500/20" : "text-gray-300"}`}
                 id="rate-like-btn"
-                title={`${video.likes || 0} Likes`}
+                title={`${likesCount} Likes`}
               >
                 <ThumbsUp className="w-3.5 h-3.5" />
-                <span className="text-xs">{video.likes || 0}</span>
+                <span className="text-xs">{likesCount}</span>
               </button>
               <div className="h-4 w-px bg-white/10 mx-0.5"></div>
               <button
                 onClick={() => handleLikeDislike("dislike")}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition duration-150 cursor-pointer ${hasRated === "dislike" ? "text-rose-400 font-bold bg-rose-500/10 border border-rose-500/20" : "text-gray-300"}`}
                 id="rate-dislike-btn"
-                title={`${video.dislikes || 0} Dislikes`}
+                title={`${dislikesCount} Dislikes`}
               >
                 <ThumbsDown className="w-3.5 h-3.5" />
-                <span className="text-xs">{video.dislikes || 0}</span>
+                <span className="text-xs">{dislikesCount}</span>
               </button>
             </div>
             
