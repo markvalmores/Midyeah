@@ -16,6 +16,8 @@ export interface UserProfile {
   isJoined?: boolean; // Joined community channel
   gcash?: string;
   paypal?: string;
+  rentalPaid?: boolean;
+  rentalExpiry?: string;
 }
 
 export interface VideoSub {

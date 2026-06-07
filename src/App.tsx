@@ -35,6 +35,7 @@ import SearchTab from "./components/SearchTab";
 import DedicatedProfilePage from "./components/DedicatedProfilePage";
 import WatchSection from "./components/WatchSection";
 import YoutubePortal from "./components/YoutubePortal";
+import { RentalPayment } from "./components/RentalPayment";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube">("home");
@@ -81,6 +82,17 @@ export default function App() {
     }
     return true;
   };
+
+  const hasRentalAccess = (): boolean => {
+    if (!currUser) return false;
+    if (isAdminAccount(currUser.email)) return true;
+    if (!currUser.rentalPaid) return false;
+    if (currUser.rentalExpiry && new Date(currUser.rentalExpiry) < new Date()) {
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     currUserRef.current = currUser;
   }, [currUser]);
@@ -1757,21 +1769,25 @@ export default function App() {
                                 Close Player
                               </button>
                             </div>
-                            <VideoPlayer
-                              video={currentVideo}
-                              currUser={currUser}
-                              onDownload={handleDownloadVideo}
-                              onSaveToLibrary={handleSaveToMidYeahLibrary}
-                              isDownloaded={downloadedIds.includes(currentVideo.id)}
-                              onSetTab={(tab) => setActiveTab(tab as any)}
-                              onNext={handleNextVideo}
-                              onViewCreator={async (creator) => {
-                                window.history.pushState({}, "", "/profile/" + (creator.username || "usagyuunvtuber"));
-                                const fresh = await getProfileByUsername(creator.username);
-                                setDedicatedProfileUser(fresh || creator);
-                                setCurrentVideo(null);
-                              }}
-                            />
+                            {currentVideo.category === 'rental' && !hasRentalAccess() ? (
+                              <RentalPayment user={currUser!} onVerified={(u) => { setCurrUser(u); }} />
+                            ) : (
+                              <VideoPlayer
+                                video={currentVideo}
+                                currUser={currUser}
+                                onDownload={handleDownloadVideo}
+                                onSaveToLibrary={handleSaveToMidYeahLibrary}
+                                isDownloaded={downloadedIds.includes(currentVideo.id)}
+                                onSetTab={(tab) => setActiveTab(tab as any)}
+                                onNext={handleNextVideo}
+                                onViewCreator={async (creator) => {
+                                  window.history.pushState({}, "", "/profile/" + (creator.username || "usagyuunvtuber"));
+                                  const fresh = await getProfileByUsername(creator.username);
+                                  setDedicatedProfileUser(fresh || creator);
+                                  setCurrentVideo(null);
+                                }}
+                              />
+                            )}
 
                             {/* PUBLIC COMMENTS SECTION - YouTube styled */}
                             <div className="bg-[#121214] border border-white/10 p-5 rounded-3xl shadow-xl space-y-4">
