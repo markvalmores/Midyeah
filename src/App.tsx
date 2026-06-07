@@ -40,10 +40,10 @@ import ProfileGroupPage from "./components/ProfileGroupPage";
 import WatchSection from "./components/WatchSection";
 import YoutubePortal from "./components/YoutubePortal";
 import { RentalPayment } from "./components/RentalPayment";
-import MembersPlusPage from "./components/MembersPlusPage";
+import AwardsTab from "./components/AwardsTab";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus" | "gamesCorner" | "youtubeEmbed">(() => {
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus" | "gamesCorner" | "youtubeEmbed" | "awards">(() => {
     return (localStorage.getItem("midyeah_active_tab_v2") as any) || "home";
   });
 
@@ -1230,6 +1230,14 @@ export default function App() {
               <span className="hidden md:inline">Worlds</span>
             </button>
             <button
+              onClick={() => { setActiveTab("awards"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "awards" ? "bg-amber-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              id="nav-tab-awards"
+            >
+              <Award className="w-4 h-4" />
+              <span className="hidden md:inline">Awards</span>
+            </button>
+            <button
               onClick={() => { setActiveTab("playlists"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "playlists" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-playlists"
@@ -2288,6 +2296,8 @@ export default function App() {
                       onSwitchTab={setActiveTab} 
                     />
                   ) : null}
+
+                  {activeTab === "awards" && <AwardsTab />}
 
                   {activeTab === "support" && (
                     <SupportTab currUser={currUser} />
