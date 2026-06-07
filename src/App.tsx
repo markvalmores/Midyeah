@@ -33,6 +33,7 @@ import DiscordChat from "./components/DiscordChat";
 import PlaylistsTab from "./components/PlaylistsTab";
 import SupportTab from "./components/SupportTab";
 import GamesCorner from "./components/GamesCorner";
+import YoutubeEmbed from "./components/YoutubeEmbed";
 import SearchTab from "./components/SearchTab";
 import DedicatedProfilePage from "./components/DedicatedProfilePage";
 import ProfileGroupPage from "./components/ProfileGroupPage";
@@ -42,7 +43,7 @@ import { RentalPayment } from "./components/RentalPayment";
 import MembersPlusPage from "./components/MembersPlusPage";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus" | "gamesCorner">(() => {
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus" | "gamesCorner" | "youtubeEmbed">(() => {
     return (localStorage.getItem("midyeah_active_tab_v2") as any) || "home";
   });
 
@@ -1221,6 +1222,14 @@ export default function App() {
               <span className="hidden md:inline">Games</span>
             </button>
             <button
+              onClick={() => { setActiveTab("youtubeEmbed"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "youtubeEmbed" ? "bg-red-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              id="nav-tab-youtubeEmbed"
+            >
+              <Youtube className="w-4 h-4" />
+              <span className="hidden md:inline">YouTube</span>
+            </button>
+            <button
               onClick={() => { setActiveTab("playlists"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "playlists" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-playlists"
@@ -2286,6 +2295,7 @@ export default function App() {
                   )}
 
                   {activeTab === "gamesCorner" && <GamesCorner />}
+                  {activeTab === "youtubeEmbed" && <YoutubeEmbed />}
 
                   {activeTab === "community" && <DiscordChat currUser={currUser} />}
 
