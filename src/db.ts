@@ -1005,7 +1005,7 @@ export async function clearAllVideos(): Promise<void> {
     tx.onerror = () => reject(tx.error);
   });
 
-  // Global clear (Hard-code delete only CURRENT USER videos from Firestore)
+  // Global clear (Hard-code delete from Firestore)
   try {
     const userEmail = auth.currentUser?.email;
     if (!userEmail) {
@@ -1014,7 +1014,11 @@ export async function clearAllVideos(): Promise<void> {
     }
 
     const collRef = collection(db, "global_videos");
-    const q = query(collRef, where("creatorEmail", "==", userEmail));
+    // ADMIN can clear EVERYTHING. Regular users clear only THEIR videos.
+    const q = isAdminAccount(userEmail) 
+      ? query(collRef) 
+      : query(collRef, where("creatorEmail", "==", userEmail));
+      
     const snap = await getDocs(q);
     const batch = writeBatch(db);
     
@@ -1024,14 +1028,14 @@ export async function clearAllVideos(): Promise<void> {
       count++;
       if (count >= 400) {
         await batch.commit();
-        // Continue with a new batch if needed, but for simplicity we Break/Commit safely
+        // Stop at first batch for safety or loop more, but 400 is plenty for one go
         break; 
       }
     }
     if (count > 0 && count < 400) {
       await batch.commit();
     }
-    console.log(`[ClearAll] Purged ${count} personal videos from network.`);
+    console.log(`[ClearAll] Purged ${count} ${isAdminAccount(userEmail) ? "GLOBAL" : "personal"} videos from network.`);
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
       isSyncStabilized = false;

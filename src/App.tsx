@@ -150,9 +150,10 @@ export default function App() {
   // HARDCORE ERADICATOR: Specifically target persistent ghost or test videos
   useEffect(() => {
     if (videosList.length > 0 && currUser?.email) {
-      // SUSPICIOUS_LOGIC: Target "Test", "Untitled", or ghost-prefixed videos OWNED by current user
+      // SUSPICIOUS_LOGIC: Target "Test", "Untitled", or ghost-prefixed videos
+      // Admin can eradicate ANY "Test" video. Regular users only THEIR own "Test" videos.
       const toEliminate = videosList.filter(v => 
-        v.creatorEmail === currUser.email && (
+        (isAdminAccount(currUser.email) || v.creatorEmail === currUser.email) && (
           v.title.toLowerCase().includes("test") ||
           v.id === "vid17" ||
           (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
@@ -396,11 +397,11 @@ export default function App() {
       // Setup Realtime multiplayer video feed
       unsubscribeVideos = subscribeAllVideos((items) => {
          // GHOST SUPPRESSION LAYER: Instantly filter out known bugged IDs
-         // NOTE: Removed 'test' title filter here so the Eradicator below can officially delete them from DB if they reappear.
          const sanitized = (items || []).filter(v => 
-           v.id !== "vid17" && 
-           !v.id.includes("ghost") &&
-           !v.id.includes("vid_placeholder")
+            v.id !== "vid17" && 
+            v.title.toLowerCase() !== "test" &&
+            !v.id.includes("ghost") &&
+            !v.id.includes("vid_placeholder")
          );
          
          setVideosList(sanitized);
@@ -410,17 +411,9 @@ export default function App() {
 
       // Instant local-first session restoration on initial boot
       const savedEmail = localStorage.getItem("midyeah_active_session_email");
-      if (savedEmail) {
+      if (savedEmail && !isAdminAccount(savedEmail)) {
         getProfile(savedEmail).then((profile) => {
           if (profile) {
-            if (isAdminAccount(profile.email) && !isAdminVerified) {
-              const accessCode = prompt(`[Session Unlocked] Enter code for ${profile.email}:`);
-              if (accessCode !== "121997") {
-                handleLogOut();
-                return;
-              }
-              setIsAdminVerified(true);
-            }
             setCurrUser(profile);
             // Do not automatically set stepAuth here
             reloadPlaylists(profile.email);
@@ -467,18 +460,10 @@ export default function App() {
       // Prevent profile reset if we already have a user
       if (currUserRef.current) return;
 
-      if (firebaseUser?.email) {
+      if (firebaseUser?.email && !isAdminAccount(firebaseUser.email)) {
         try {
           const profile = await getProfile(firebaseUser.email);
           if (profile) {
-            if (isAdminAccount(profile.email) && !isAdminVerified) {
-              const accessCode = prompt(`[Admin Verified] Final verification for ${profile.email}:`);
-              if (accessCode !== "121997") {
-                handleLogOut();
-                return;
-              }
-              setIsAdminVerified(true);
-            }
             localStorage.setItem("midyeah_active_session_email", firebaseUser.email);
             setCurrUser(profile);
             // Do not automatically set stepAuth here
@@ -1302,7 +1287,7 @@ export default function App() {
                   <input
                     type="email"
                     required
-                    placeholder="e.g. mdv@futureamazing.com"
+                    placeholder="e.g. cozy@midyeah.com"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                     className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition"

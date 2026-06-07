@@ -32,8 +32,8 @@ export default function Livestream() {
 
   // Stream Chats
   const [messages, setMessages] = useState<{ sender: string; text: string; isTip?: boolean }[]>([
-    { sender: "Mark David Valmores", text: "Welcome fellow creator! Let's build a joyful future." },
-    { sender: "MidyBunny 🐰", text: "Midy is drinking coffee watching your stream! Good luck! ☕" }
+    { sender: "System Operator", text: "Welcome creator! Let's build a joyful future." },
+    { sender: "MidyBunny 🐰", text: "Midy is watching your stream! Good luck! ☕" }
   ]);
   const [entryMsg, setEntryMsg] = useState("");
 
