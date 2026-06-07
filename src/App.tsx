@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles, Youtube, ExternalLink,
+  Video as VideoIcon, Tv, Radio, Gamepad, Gamepad2, User, LogIn, Plus, Sparkles, Youtube, ExternalLink,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
   Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search, Info, MonitorPlay, Award
 } from "lucide-react";
@@ -32,6 +32,7 @@ import Profile from "./components/Profile";
 import DiscordChat from "./components/DiscordChat";
 import PlaylistsTab from "./components/PlaylistsTab";
 import SupportTab from "./components/SupportTab";
+import GamesCorner from "./components/GamesCorner";
 import SearchTab from "./components/SearchTab";
 import DedicatedProfilePage from "./components/DedicatedProfilePage";
 import ProfileGroupPage from "./components/ProfileGroupPage";
@@ -41,7 +42,7 @@ import { RentalPayment } from "./components/RentalPayment";
 import MembersPlusPage from "./components/MembersPlusPage";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus">(() => {
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup" | "membersPlus" | "gamesCorner">(() => {
     return (localStorage.getItem("midyeah_active_tab_v2") as any) || "home";
   });
 
@@ -1212,6 +1213,14 @@ export default function App() {
               <span className="hidden md:inline">Radio</span>
             </button>
             <button
+              onClick={() => { setActiveTab("gamesCorner"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "gamesCorner" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              id="nav-tab-gamesCorner"
+            >
+              <Gamepad2 className="w-4 h-4" />
+              <span className="hidden md:inline">Games</span>
+            </button>
+            <button
               onClick={() => { setActiveTab("playlists"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "playlists" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-playlists"
@@ -2275,6 +2284,8 @@ export default function App() {
                   {activeTab === "support" && (
                     <SupportTab currUser={currUser} />
                   )}
+
+                  {activeTab === "gamesCorner" && <GamesCorner />}
 
                   {activeTab === "community" && <DiscordChat currUser={currUser} />}
 
