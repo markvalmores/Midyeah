@@ -649,17 +649,7 @@ export function subscribeAllVideos(callback: (videos: Video[]) => void): () => v
         mergedVideosMap.set(v.id, v);
       });
 
-      // SYNC CLEANUP: If a video was deleted from remote but exists in local cache, REMOVE it from local cache too.
-      // This kills "Ghost" videos that keep reappearing.
-      const remoteIds = new Set(remoteVideos.map(rv => rv.id));
-      for (const [localId, localVid] of cachedMap.entries()) {
-        if (!remoteIds.has(localId)) {
-          // It was deleted remotely, so we should delete it locally too
-          console.log(`Killing ghost video: ${localId}`);
-          deleteVideo(localId).catch(e => console.warn("Ghost kill failed:", e));
-        }
-      }
-
+      // Include local-only videos (unsynced or offline)
       cachedDbVideos.forEach(v => {
         if (!mergedVideosMap.has(v.id)) {
           mergedVideosMap.set(v.id, v);
@@ -676,8 +666,14 @@ export function subscribeAllVideos(callback: (videos: Video[]) => void): () => v
       remoteVideos.sort((a, b) => b.id.localeCompare(a.id));
       callback(remoteVideos);
     }
-  }, (err) => {
-    console.warn("Realtime videos subscription issue:", err);
+  }, async (err) => {
+    console.warn("Realtime videos subscription issue, falling back to local list:", err);
+    try {
+      const localItems = await getAllVideos();
+      callback(localItems);
+    } catch (localErr) {
+      console.error("Critical: Local video fetch also failed:", localErr);
+    }
   });
 }
 

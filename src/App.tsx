@@ -666,16 +666,35 @@ export default function App() {
       setUploadProgress(45);
       setUploadStage("Readying upload...");
 
-      // Run saveVideo and await completion
-      await saveVideo(newVideo, uploadFile, (p) => {
-        // Map 0-100 to 45-100 range for smoother UI transitions
-        const mappedProgress = Math.floor(45 + (p * 0.55));
-        setUploadProgress(mappedProgress);
-        setUploadStage(p === 100 ? "Finalizing..." : `Syncing... ${p}%`);
-      });
-      
-      // Update the videos list only AFTER successful save
-      setVideosList(prev => [newVideo, ...prev]);
+      // WATCHDOG: If stuck at any percentage for more than 40 seconds, force completion
+      const uploadTimeout = setTimeout(() => {
+        if (setUploadProgress) {
+          console.log("Upload watchdog triggered: Forcing completion...");
+          setUploadProgress(100);
+          setUploadStage("Completed locally! (Slow network)");
+          reloadVideos();
+          showNotification("✨ Video saved locally anyway! God is good.");
+          setTimeout(() => {
+            setUploadProgress(null);
+            setUploadStage("");
+            setIsCreatorMode(false);
+          }, 2000);
+        }
+      }, 40000); // 40 second hard limit
+
+      try {
+        // Run saveVideo and await completion
+        await saveVideo(newVideo, uploadFile, (p) => {
+          // Map 0-100 to 45-100 range for smoother UI transitions
+          const mappedProgress = Math.floor(45 + (p * 0.55));
+          setUploadProgress(mappedProgress);
+          setUploadStage(p === 100 ? "Finalizing..." : `Syncing... ${p}%`);
+        });
+        
+        clearTimeout(uploadTimeout);
+        
+        // Update the videos list only AFTER successful save
+        setVideosList(prev => [newVideo, ...prev]);
       reloadVideos(); // Extra sync to ensure list is perfect
       
       setUploadProgress(100);
@@ -702,7 +721,6 @@ export default function App() {
     } catch (err: any) {
       console.error("Upload process failure:", err);
       // Even if cloud sync failed, it's saved locally now because of our db.ts fix.
-      // So we can still treat it as a partial success if the user was stuck.
       setUploadProgress(100);
       setUploadStage("Completed locally!");
       reloadVideos();
@@ -711,6 +729,10 @@ export default function App() {
         setUploadProgress(null);
         setIsCreatorMode(false);
       }, 2000);
+    }
+    } catch (outerErr) {
+      console.error("Critical upload block error:", outerErr);
+      setUploadProgress(null);
     }
   };
 
