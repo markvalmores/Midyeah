@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Hash, MessageSquare, Send, Bell, Settings, HelpCircle, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { getDiscordMessages, saveDiscordMessage, db } from "../db";
+import { getDiscordMessages, saveDiscordMessage, db, isGuestAccount } from "../db";
 import { DiscordMessage, UserProfile } from "../types";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
@@ -66,6 +66,10 @@ export default function DiscordChat({ currUser }: DiscordChatProps) {
 
   const handleSendPost = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuestAccount(currUser?.email)) {
+      alert("MidYeah Circle: Guest accounts are read-only to prevent botting.");
+      return;
+    }
     if (!inputText.trim()) return;
 
     const newMsg: DiscordMessage = {

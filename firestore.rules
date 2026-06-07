@@ -83,6 +83,10 @@ service cloud.firestore {
           && data.type is string && data.type.size() <= 100;
     }
 
+    function isGuest() {
+      return isSignedIn() && request.auth.token.email == "guest@midyeah.com";
+    }
+
     // 2. User Profiles mapping
     match /profiles/{email} {
       allow read: if true;
@@ -95,17 +99,16 @@ service cloud.firestore {
     // 3. Global Videos mapping
     match /global_videos/{videoId} {
       allow read: if true; // Public list viewing allowed
-      allow create: if isSignedIn() && isValidId(videoId) 
+      allow create: if isSignedIn() && !isGuest() && isValidId(videoId) 
                     && request.resource.data.creatorEmail == request.auth.token.email
                     && isValidVideo(request.resource.data);
       allow update: if isValidId(videoId)
-                    && ( (isSignedIn() && resource.data.creatorEmail == request.auth.token.email) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'dislikes', 'reactions']) )
+                    && ( 
+                      (isSignedIn() && !isGuest() && resource.data.creatorEmail == request.auth.token.email) || 
+                      (isSignedIn() && !isGuest() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'dislikes', 'reactions']))
+                    )
                     && isValidVideo(request.resource.data);
-      allow delete: if isSignedIn() && (
-                      resource.data.creatorEmail == request.auth.token.email || 
-                      resource.data.creatorEmail == "guest@midyeah.com" ||
-                      resource.data.title.lower().matches(".*test.*")
-                    );
+      allow delete: if isSignedIn() && (resource.data.creatorEmail == request.auth.token.email && !isGuest());
 
       // Chunks subcollection
       match /chunks/{chunkId} {
@@ -121,10 +124,15 @@ service cloud.firestore {
       // Comments subcollection
       match /comments/{commentId} {
         allow read: if true; // Comments can be read globally
-        allow create: if isSignedIn() && isValidId(commentId)
+        allow create: if isSignedIn() && !isGuest() && isValidId(commentId)
                       && isValidComment(request.resource.data);
-        allow update, delete: if isSignedIn() && isValidId(commentId)
-                              && (resource.data.username == request.auth.token.name || get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email);
+        allow update: if isSignedIn() && !isGuest() && isValidId(commentId)
+                      && (resource.data.username == request.auth.token.name || get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email);
+        allow delete: if isSignedIn() && !isGuest() && isValidId(commentId)
+                      && (
+                        resource.data.username == request.auth.token.name || 
+                        get(/databases/$(database)/documents/global_videos/$(videoId)).data.creatorEmail == request.auth.token.email
+                      );
       }
     }
 
@@ -158,27 +166,27 @@ service cloud.firestore {
     // 7. Subscriptions mappings
     match /subscriptions/{subId} {
       allow read: if true;
-      allow create, delete: if isSignedIn() && isValidId(subId);
+      allow create, delete: if isSignedIn() && !isGuest() && isValidId(subId);
     }
 
     // 8. Group Memberships
     match /group_memberships/{membershipId} {
       allow read: if true;
-      allow create, delete: if isSignedIn() && isValidId(membershipId);
+      allow create, delete: if isSignedIn() && !isGuest() && isValidId(membershipId);
     }
 
     // 9. Persistent Likes/Dislikes
     match /likes_dislikes/{likeId} {
       allow read: if true;
-      allow create, update: if isValidId(likeId) && isValidLikeDislike(request.resource.data);
-      allow delete: if isValidId(likeId);
+      allow create, update: if isSignedIn() && !isGuest() && isValidId(likeId) && isValidLikeDislike(request.resource.data);
+      allow delete: if isSignedIn() && !isGuest() && isValidId(likeId);
     }
 
     // 10. Persistent Video Reactions
     match /video_reactions/{reactId} {
       allow read: if true;
-      allow create, update: if isValidId(reactId) && isValidVideoReaction(request.resource.data);
-      allow delete: if isValidId(reactId);
+      allow create, update: if isSignedIn() && !isGuest() && isValidId(reactId) && isValidVideoReaction(request.resource.data);
+      allow delete: if isSignedIn() && !isGuest() && isValidId(reactId);
     }
 
   }

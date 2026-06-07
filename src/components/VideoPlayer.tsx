@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Video, VideoSub, UserProfile } from "../types";
-import { savePlayOffset, getPlayOffset, saveVideo, toggleSubscription, checkSubscriptionStatus, toggleGroupMembership, checkGroupStatus, saveLikeDislikeStatus, getLikeDislikeStatus, saveVideoReactionStatus, getVideoReactionStatus } from "../db";
+import { 
+  savePlayOffset, getPlayOffset, saveVideo, toggleSubscription, 
+  checkSubscriptionStatus, toggleGroupMembership, checkGroupStatus, 
+  saveLikeDislikeStatus, getLikeDislikeStatus, saveVideoReactionStatus, 
+  getVideoReactionStatus, isGuestAccount 
+} from "../db";
 
 interface VideoPlayerProps {
   video: Video;
@@ -403,6 +408,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
   // React handling (Facebook reactions)
   const handleReaction = (reactType: string) => {
+    if (isGuestAccount(currUser?.email)) {
+      alert("Guess account are for watching only! Log in to react and interact with creators.");
+      return;
+    }
     let freshReacts = { ...reactCounts };
     const userIdentifier = currUser?.email || (() => {
       let localAnon = localStorage.getItem("midyeah_anon_user_id");
@@ -439,6 +448,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   };
 
   const handleLikeDislike = (type: "like" | "dislike") => {
+    if (isGuestAccount(currUser?.email)) {
+      alert("Watching-only mode enabled for guest accounts. Sign in to rate this content!");
+      return;
+    }
     let newLikes = video.likes || 0;
     let newDislikes = video.dislikes || 0;
     let nextRated: "like" | "dislike" | null = null;
@@ -981,7 +994,13 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
             
             {/* Download cache button */}
             <button
-              onClick={() => onDownload(video, downloadResolution)}
+              onClick={() => {
+                if (isGuestAccount(currUser?.email)) {
+                  alert("Restricted: Guests cannot save videos offline.");
+                  return;
+                }
+                onDownload(video, downloadResolution);
+              }}
               className={`flex items-center gap-1 text-xs px-3 py-1 rounded-xl font-medium transition cursor-pointer ${isDownloaded ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800" : "bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-900/60"}`}
               id="download-offline-btn"
             >
@@ -991,7 +1010,13 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
             
             {/* Save to MidYeah Library button */}
             <button
-              onClick={() => onSaveToLibrary(video)}
+              onClick={() => {
+                if (isGuestAccount(currUser?.email)) {
+                  alert("Guests cannot save to personal library.");
+                  return;
+                }
+                onSaveToLibrary(video);
+              }}
               className="flex items-center gap-1 text-xs px-3 py-1 rounded-xl font-medium bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-900/60 transition cursor-pointer"
               id="save-to-midyeah-lib-btn"
             >
@@ -1081,6 +1106,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
                   alert("Please sign in to subscribe!");
                   return;
                 }
+                if (isGuestAccount(currUser.email)) {
+                  alert("Restricted: Guests cannot subscribe to channels.");
+                  return;
+                }
                 try {
                   const status = await toggleSubscription(currUser.email, video.creator.email);
                   setIsSubscribed(status);
@@ -1103,6 +1132,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
               onClick={async () => {
                 if (!currUser) {
                   alert("Please sign in to join groups!");
+                  return;
+                }
+                if (isGuestAccount(currUser.email)) {
+                  alert("Group settings: Guests cannot join channel groups.");
                   return;
                 }
                 try {

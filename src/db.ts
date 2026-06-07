@@ -23,6 +23,13 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRIT
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
+const GUEST_EMAIL = "guest@midyeah.com";
+
+export function isGuestAccount(email?: string): boolean {
+  const currentEmail = email || auth.currentUser?.email;
+  return currentEmail === GUEST_EMAIL;
+}
+
 export async function authenticateUser(email: string, pass: string): Promise<void> {
   try {
     await createUserWithEmailAndPassword(auth, email, pass);
@@ -413,6 +420,10 @@ export async function getUserCount(): Promise<number> {
 
 // Profile Sync functions
 export async function saveProfile(profile: UserProfile): Promise<void> {
+  if (isGuestAccount(profile.email)) {
+    console.warn("Guest accounts cannot modify their profiles.");
+    return;
+  }
   // Save locally to IndexedDB
   try {
     const localDb = await openDB();
@@ -629,6 +640,9 @@ export async function getProfileByUsername(username: string): Promise<UserProfil
 
 // Video Sync functions
 export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p: number) => void): Promise<void> {
+  if (isGuestAccount(video.creator.email)) {
+    throw new Error("Guest accounts are strictly prohibited from uploading or saving videos.");
+  }
   // Save locally in IndexedDB first (completes instantly, <10ms, working and available 100% offline)
   const localDb = await openDB();
   await new Promise<void>((resolve, reject) => {
@@ -985,10 +999,17 @@ export async function clearAllVideos(): Promise<void> {
     tx.onerror = () => reject(tx.error);
   });
 
-  // Global clear (Hard-code delete all videos from Firestore as well)
+  // Global clear (Hard-code delete only CURRENT USER videos from Firestore)
   try {
+    const userEmail = auth.currentUser?.email;
+    if (!userEmail) {
+      console.warn("Cannot clear global videos: No authenticated user.");
+      return;
+    }
+
     const collRef = collection(db, "global_videos");
-    const snap = await getDocs(collRef);
+    const q = query(collRef, where("creatorEmail", "==", userEmail));
+    const snap = await getDocs(q);
     const batch = writeBatch(db);
     
     let count = 0;
@@ -997,12 +1018,14 @@ export async function clearAllVideos(): Promise<void> {
       count++;
       if (count >= 400) {
         await batch.commit();
-        break; // Stop at first batch for safety
+        // Continue with a new batch if needed, but for simplicity we Break/Commit safely
+        break; 
       }
     }
     if (count > 0 && count < 400) {
       await batch.commit();
     }
+    console.log(`[ClearAll] Purged ${count} personal videos from network.`);
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
       isSyncStabilized = false;
@@ -1014,6 +1037,9 @@ export async function clearAllVideos(): Promise<void> {
 
 // Global Video Comments
 export async function saveComment(comment: Comment): Promise<void> {
+  if (isGuestAccount(auth.currentUser?.email || "")) {
+    throw new Error("Guest accounts cannot post comments.");
+  }
   const cleanedComment = {
     id: comment.id,
     videoId: comment.videoId,
@@ -1108,6 +1134,9 @@ export function subscribeVideoComments(videoId: string, callback: (comments: Com
 
 // Subscription & Follower Logic
 export async function toggleSubscription(followerEmail: string, followedEmail: string): Promise<boolean> {
+  if (isGuestAccount(followerEmail)) {
+    throw new Error("Guest accounts cannot subscribe to creators.");
+  }
   if (followerEmail === followedEmail) return false;
   
   // Sanitize ID for Firestore document safety
@@ -1205,6 +1234,9 @@ export function subscribeToSubscribersCount(email: string, callback: (count: num
 
 // Group Membership Logic
 export async function toggleGroupMembership(email: string, groupId: string): Promise<boolean> {
+  if (isGuestAccount(email)) {
+    throw new Error("Guest accounts cannot join groups.");
+  }
   const safeEmail = email.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
   const safeGroup = groupId.replace(/[^a-zA-Z0-9_.\-@+]/g, "_");
   const membershipId = `${safeEmail}_in_${safeGroup}`;
@@ -1245,6 +1277,9 @@ export async function checkGroupStatus(email: string, groupId: string): Promise<
 
 // Discord Messages Sync functions (global community chats)
 export async function saveDiscordMessage(msg: DiscordMessage): Promise<void> {
+  if (isGuestAccount(auth.currentUser?.email || "")) {
+    throw new Error("Guest accounts cannot send community messages.");
+  }
   const cleanMsg = {
     id: msg.id,
     username: msg.username,
@@ -1339,6 +1374,9 @@ export async function getPlayOffset(videoId: string): Promise<number> {
 
 // Custom Playlist Firestore and offline handlers
 export async function createPlaylist(name: string, ownerEmail: string): Promise<Playlist> {
+  if (isGuestAccount(ownerEmail)) {
+    throw new Error("Guest accounts cannot create playlists.");
+  }
   const newPlaylist: Playlist = {
     id: "pl_" + Math.random().toString(36).substring(2, 11),
     name,
@@ -1576,6 +1614,9 @@ export async function saveLikeDislikeStatus(
   videoId: string,
   type: "like" | "dislike" | null
 ): Promise<void> {
+  if (isGuestAccount(userId)) {
+    throw new Error("Guest accounts cannot rate videos.");
+  }
   const likeId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
   const docRef = doc(db, "likes_dislikes", likeId);
   const path = `likes_dislikes/${likeId}`;
@@ -1621,6 +1662,9 @@ export async function saveVideoReactionStatus(
   videoId: string,
   type: string | null
 ): Promise<void> {
+  if (isGuestAccount(userId)) {
+    throw new Error("Guest accounts cannot react to videos.");
+  }
   const reactId = `${userId}_video_${videoId}`.replace(/[^a-zA-Z0-9_\-]/g, "_");
   const docRef = doc(db, "video_reactions", reactId);
   const path = `video_reactions/${reactId}`;

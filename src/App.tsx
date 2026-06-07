@@ -17,7 +17,7 @@ import {
   subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
   getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount,
-  subscribeVideoComments, getProfileByUsername
+  subscribeVideoComments, getProfileByUsername, isGuestAccount
 } from "./db";
 
 import Mascot from "./components/Mascot";
@@ -136,13 +136,16 @@ export default function App() {
 
   // HARDCORE ERADICATOR: Specifically target persistent ghost or test videos
   useEffect(() => {
-    if (videosList.length > 0) {
-      // SUSPICIOUS_LOGIC: Target "Test", "Untitled", or ghost-prefixed videos
+    if (videosList.length > 0 && currUser?.email) {
+      // SUSPICIOUS_LOGIC: Target "Test", "Untitled", or ghost-prefixed videos OWNED by current user
       const toEliminate = videosList.filter(v => 
-        v.title.toLowerCase().includes("test video") ||
-        (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
-        v.id.includes("ghost") || 
-        v.id.includes("vid_placeholder")
+        v.creatorEmail === currUser.email && (
+          v.title.toLowerCase().includes("test") ||
+          v.id === "vid17" ||
+          (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
+          v.id.includes("ghost") || 
+          v.id.includes("vid_placeholder")
+        )
       );
       
       if (toEliminate.length > 0) {
@@ -151,11 +154,15 @@ export default function App() {
            deleteVideo(v.id).then(() => {
               setVideosList(prev => prev.filter(item => item.id !== v.id));
               console.log(`[Eradicator] Permanently purged: ${v.id} (${v.title})`);
-           }).catch(e => console.warn("Eradicator failure for video:", v.id, e));
+           }).catch(e => {
+             console.warn("Eradicator failure for video:", v.id, e);
+             // Aggressive retry: Force delete locally if network fails
+             setVideosList(prev => prev.filter(item => item.id !== v.id));
+           });
         });
       }
     }
-  }, [videosList]);
+  }, [videosList, currUser]);
 
   const handleDeleteSingleVideo = async (id: string) => {
     try {
@@ -375,8 +382,16 @@ export default function App() {
     openDB().then(() => {
       // Setup Realtime multiplayer video feed
       unsubscribeVideos = subscribeAllVideos((items) => {
-         setVideosList(items || []);
-         const savedOfflines = items.filter(v => v.isOffline).map(v => v.id);
+         // GHOST SUPPRESSION LAYER: Instantly filter out known bugged IDs
+         // NOTE: Removed 'test' title filter here so the Eradicator below can officially delete them from DB if they reappear.
+         const sanitized = (items || []).filter(v => 
+           v.id !== "vid17" && 
+           !v.id.includes("ghost") &&
+           !v.id.includes("vid_placeholder")
+         );
+         
+         setVideosList(sanitized);
+         const savedOfflines = sanitized.filter(v => v.isOffline).map(v => v.id);
          setDownloadedIds(savedOfflines);
       });
 
@@ -680,6 +695,12 @@ export default function App() {
   const handleVideoUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isGuestAccount(currUser?.email)) {
+      alert("GUARDS: Guest accounts are strictly forbidden from uploading to MidYeah.");
+      setIsCreatorMode(false);
+      return;
+    }
+
     if (uploadSource === "local" && !uploadFile) {
       alert("Please upload a supported video file.");
       return;
@@ -882,6 +903,10 @@ export default function App() {
 
   const handleDeleteAccount = async () => {
     if (!currUser?.email) return;
+    if (isGuestAccount(currUser.email)) {
+      alert("Guest accounts cannot be deleted as they are shared system resources.");
+      return;
+    }
     try {
       await deleteProfileFromDb(currUser.email);
       localStorage.removeItem("midyeah_active_session_email");
@@ -1110,6 +1135,10 @@ export default function App() {
               {/* Creator Mode / Watcher Mode Toggle switcher */}
               <button
                 onClick={() => {
+                  if (!isCreatorMode && isGuestAccount(currUser?.email)) {
+                    alert("Guest accounts are for watching only. Join MidYeah to post content!");
+                    return;
+                  }
                   setIsCreatorMode(!isCreatorMode);
                   setCurrentVideo(null); // idle player
                   setDedicatedProfileUser(null);
@@ -1871,7 +1900,13 @@ export default function App() {
                               {!showConfirmDeleteAll ? (
                                 <button
                                   type="button"
-                                  onClick={() => setShowConfirmDeleteAll(true)}
+                                  onClick={() => {
+                                    if (isGuestAccount(currUser?.email)) {
+                                      alert("Account protection active: Guests cannot delete content.");
+                                      return;
+                                    }
+                                    setShowConfirmDeleteAll(true);
+                                  }}
                                   className="flex items-center gap-1 bg-[#1C1C1F] hover:bg-red-950/20 text-red-400 border border-red-500/20 hover:border-red-500/50 p-1.5 px-3 rounded-xl font-bold transition-all cursor-pointer"
                                   id="delete-all-btn-trigger"
                                 >
@@ -1916,7 +1951,7 @@ export default function App() {
                               ? "You are currently playing in Offline viewing mode. Go back online and click save on release items to cache them local!"
                               : "MidYeah starts clean with no streams. Toggle 'Creator view' on the top right header to upload and persist your first MP4!"}
                           </p>
-                          {!offlineMode && (
+                          {!offlineMode && !isGuestAccount(currUser?.email) && (
                             <button
                               onClick={() => setIsCreatorMode(true)}
                               className="mt-4 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs p-2 px-4 rounded-xl transition duration-200 cursor-pointer shadow"
@@ -2034,37 +2069,41 @@ export default function App() {
                                       </div>
                                     )}
 
-                                    {deletingVideoId !== vid.id ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setDeletingVideoId(vid.id)}
-                                        className="p-1 text-slate-500 hover:text-red-400 transition cursor-pointer rounded"
-                                        title="Delete Video"
-                                        id={`delete-vid-btn-${vid.id}`}
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    ) : (
-                                      <div className="flex items-center gap-1 bg-red-950/80 border border-red-500/30 rounded px-1.5 py-0.5 text-white">
-                                        <span className="text-[8px] font-bold select-none text-[8px]">Delete?</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteSingleVideo(vid.id)}
-                                          className="text-red-400 hover:text-red-300 font-extrabold uppercase text-[8px] cursor-pointer"
-                                          id={`confirm-delete-vid-${vid.id}`}
-                                        >
-                                          Yes
-                                        </button>
-                                        <span className="text-gray-600">|</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => setDeletingVideoId(null)}
-                                          className="text-gray-400 hover:text-white text-[8px] cursor-pointer"
-                                          id={`cancel-delete-vid-${vid.id}`}
-                                        >
-                                          No
-                                        </button>
-                                      </div>
+                                    {(currUser?.email === vid.creatorEmail || currUser?.email === vid.creator?.email) && (
+                                      <>
+                                        {deletingVideoId !== vid.id ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => setDeletingVideoId(vid.id)}
+                                            className="p-1 text-slate-500 hover:text-red-400 transition cursor-pointer rounded"
+                                            title="Delete Video"
+                                            id={`delete-vid-btn-${vid.id}`}
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        ) : (
+                                          <div className="flex items-center gap-1 bg-red-950/80 border border-red-500/30 rounded px-1.5 py-0.5 text-white">
+                                            <span className="text-[8px] font-bold select-none text-[8px]">Delete?</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteSingleVideo(vid.id)}
+                                              className="text-red-400 hover:text-red-300 font-extrabold uppercase text-[8px] cursor-pointer"
+                                              id={`confirm-delete-vid-${vid.id}`}
+                                            >
+                                              Yes
+                                            </button>
+                                            <span className="text-gray-600">|</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => setDeletingVideoId(null)}
+                                              className="text-gray-400 hover:text-white text-[8px] cursor-pointer"
+                                              id={`cancel-delete-vid-${vid.id}`}
+                                            >
+                                              No
+                                            </button>
+                                          </div>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 </div>
@@ -2077,7 +2116,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {activeTab === "rooms" && <WatchRoom />}
+                  {activeTab === "rooms" && <WatchRoom currUser={currUser} />}
 
                   {activeTab === "watch" && <WatchSection />}
 

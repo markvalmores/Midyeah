@@ -9,9 +9,14 @@ import {
   CameraOff, Send, LogOut, Check, Info, ShieldAlert, KeyRound
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { WatchRoom as RoomType } from "../types";
+import { WatchRoom as RoomType, UserProfile } from "../types";
+import { isGuestAccount } from "../db";
 
-export default function WatchRoom() {
+interface WatchRoomProps {
+  currUser: UserProfile | null;
+}
+
+export default function WatchRoom({ currUser }: WatchRoomProps) {
   const [rooms, setRooms] = useState<RoomType[]>([
     { id: "room1", name: "Midnight Movie Stream 🍿", isPublic: true, inviteCode: "MID-9923", creator: "Usagyuun Fans" },
     { id: "room2", name: "Bunny Coffee Chat Cozy ☕", isPublic: true, inviteCode: "BUN-2041", creator: "MidyBunny" }
@@ -83,6 +88,10 @@ export default function WatchRoom() {
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuestAccount(currUser?.email)) {
+      alert("Guests cannot host watchrooms. Join MidYeah to lead the stream!");
+      return;
+    }
     if (!newRoomName.trim()) return;
 
     const code = inviteCode || "MID-" + Math.floor(1000 + Math.random() * 9000);
@@ -128,6 +137,10 @@ export default function WatchRoom() {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuestAccount(currUser?.email)) {
+      alert("Watch-only account: Guests cannot participate in room chats.");
+      return;
+    }
     if (!newMessage.trim() || !activeRoom) return;
     setRoomChats(p => [...p, { sender: "You", text: newMessage }]);
     setNewMessage("");

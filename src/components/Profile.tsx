@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, Video } from "../types";
-import { subscribeToSubscribersCount } from "../db";
+import { subscribeToSubscribersCount, isGuestAccount } from "../db";
 
 interface ProfileProps {
   profile: UserProfile;
@@ -85,6 +85,10 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
   const isPartnerApproved = realSubsCount >= 777 && watchHrsDisp >= 340 && realTotalLikes >= 3400;
 
   const handleAvatarFile = (file: File) => {
+    if (isGuestAccount(profile?.email)) {
+      alert("Guest avatars are protected. Log in to personalize your channel!");
+      return;
+    }
     if (!file.type.startsWith("image/")) {
       alert("Please upload a valid image file.");
       return;
@@ -109,6 +113,10 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
   };
 
   const handleCoverFile = (file: File) => {
+    if (isGuestAccount(profile?.email)) {
+      alert("Guest profiles are read-only. Create an account to customize backdrops!");
+      return;
+    }
     if (!file.type.startsWith("image/")) {
       alert("Please upload a valid image file.");
       return;
@@ -134,6 +142,10 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
 
   const handleProfileSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isGuestAccount(profile?.email)) {
+      alert("Watching-only mode: Guest profiles cannot be modified.");
+      return;
+    }
     onUpdate({
       ...profile,
       username,
@@ -154,6 +166,10 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
 
   const handleLinkPayout = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuestAccount(profile?.email)) {
+      alert("Account restricted: Guest withdrawals are simulated only.");
+      return;
+    }
     onUpdate({
       ...profile,
       gcash,
