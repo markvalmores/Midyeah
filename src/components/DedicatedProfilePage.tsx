@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   ArrowLeft, CheckCircle, Share2, Globe, Heart, Play, 
   Tv, Sparkles, Flame, UserCheck, Calendar, ShieldCheck 
@@ -11,6 +11,11 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, Video } from "../types";
 import Profile from "./Profile";
+import { 
+  toggleSubscription, 
+  checkSubscriptionStatus, 
+  subscribeToSubscribersCount 
+} from "../db";
 
 interface DedicatedProfilePageProps {
   ownerProfile: UserProfile;
@@ -36,14 +41,50 @@ export default function DedicatedProfilePage({
   const [showEditMode, setShowEditMode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [hasSubscribed, setHasSubscribed] = useState(false);
+  const [liveSubCount, setLiveSubCount] = useState<number>(ownerProfile.subscribersCount || 0);
 
   const isOwnProfile = currentUser && currentUser.email === ownerProfile.email;
+
+  // Sync real-time subscribers count directly from Firestore collection snapshots:
+  useEffect(() => {
+    if (ownerProfile?.email) {
+      const unsub = subscribeToSubscribersCount(ownerProfile.email, (count) => {
+        setLiveSubCount(count);
+      });
+      return () => unsub();
+    }
+  }, [ownerProfile?.email]);
+
+  // Sync initial and real-time subscription statuses:
+  useEffect(() => {
+    if (currentUser?.email && ownerProfile?.email) {
+      checkSubscriptionStatus(currentUser.email, ownerProfile.email).then((status) => {
+        setHasSubscribed(status);
+      });
+    } else {
+      setHasSubscribed(false);
+    }
+  }, [currentUser?.email, ownerProfile?.email]);
+
+  const handleToggleSubscribe = async () => {
+    if (!currentUser) {
+      alert("Please sign in or link your channel to subscribe to other creators! ☕🐰");
+      return;
+    }
+    if (isOwnProfile) return;
+    try {
+      const isSubbedNow = await toggleSubscription(currentUser.email, ownerProfile.email);
+      setHasSubscribed(isSubbedNow);
+    } catch (err) {
+      console.error("Failed to toggle subscription in database:", err);
+    }
+  };
 
   // Real-time calculation based on videos
   const creatorLikes = creatorVideos.reduce((acc, v) => acc + (v.likes || 0), 0);
   const creatorViews = creatorVideos.reduce((acc, v) => acc + (v.views || 0), 0);
   const watchHrs = creatorVideos.reduce((acc, v) => acc + (((v.duration || 0) * (v.views || 0)) / 3600), 0);
-  const isVerified = (ownerProfile.subscribersCount || 0) >= 777 || isOwnProfile;
+  const isVerified = liveSubCount >= 777 || isOwnProfile;
 
   const profileUrl = `${window.location.origin}/profile/${ownerProfile.username || "usagyuunvtuber"}`;
 
@@ -161,7 +202,7 @@ export default function DedicatedProfilePage({
               <div className="flex items-center gap-3">
                 {!isOwnProfile ? (
                   <button
-                    onClick={() => setHasSubscribed(!hasSubscribed)}
+                    onClick={handleToggleSubscribe}
                     className={`p-3 px-5 rounded-2xl font-black text-xs uppercase tracking-wider transition duration-150 cursor-pointer flex items-center gap-2 ${
                       hasSubscribed 
                         ? "bg-slate-800 border border-white/10 text-slate-400" 
@@ -215,7 +256,7 @@ export default function DedicatedProfilePage({
                   <div className="bg-[#1C1C1F] border border-white/5 rounded-xl p-2.5">
                     <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold text-[9px] mb-1">Subscribers</div>
                     <div className="font-mono text-base font-black text-white">
-                      {(ownerProfile.subscribersCount || 0) + (hasSubscribed ? 1 : 0)}
+                      {liveSubCount}
                     </div>
                   </div>
                   <div className="bg-[#1C1C1F] border border-white/5 rounded-xl p-2.5">

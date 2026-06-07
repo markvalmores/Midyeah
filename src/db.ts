@@ -1143,6 +1143,44 @@ export async function checkSubscriptionStatus(followerEmail: string, followedEma
   }
 }
 
+/**
+ * Real-time direct snapshot listener on the 'subscriptions' collection.
+ * Obtains the 100% real count, invokes callback and fixes Firestore profiles record so there is never any fake subscribers.
+ */
+export function subscribeToSubscribersCount(email: string, callback: (count: number) => void): () => void {
+  const q = query(collection(db, "subscriptions"), where("followedEmail", "==", email));
+  return onSnapshot(q, async (snap) => {
+    const trueCount = snap.size;
+    callback(trueCount);
+    // Correct the database count so there are never any discrepancies or "fake" subscribers:
+    try {
+      const profileRef = doc(db, "profiles", email);
+      await updateDoc(profileRef, {
+        subscribersCount: trueCount
+      });
+      
+      // Update local storage and IndexedDB caches
+      try {
+        const cachedRaw = localStorage.getItem("midyeah_profile_" + email);
+        if (cachedRaw) {
+          const u = JSON.parse(cachedRaw) as UserProfile;
+          u.subscribersCount = trueCount;
+          localStorage.setItem("midyeah_profile_" + email, JSON.stringify(u));
+          if (u.username) {
+            localStorage.setItem("midyeah_profile_by_username_" + u.username.toLowerCase(), JSON.stringify(u));
+          }
+        }
+      } catch (cacheErr) {
+        console.warn("Could not update subscriber cache in local storage:", cacheErr);
+      }
+    } catch (err) {
+      console.warn("Could not auto-correct Firestore profile subscribers count:", err);
+    }
+  }, (err) => {
+    console.error("Failed to subscribe to subscribers count:", err);
+  });
+}
+
 // Group Membership Logic
 export async function toggleGroupMembership(email: string, groupId: string): Promise<boolean> {
   const membershipId = `${email}_in_${groupId}`;

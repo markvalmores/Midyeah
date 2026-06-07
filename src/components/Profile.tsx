@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   User, Mail, Camera, Link as LinkIcon, BadgePercent, Award,
   Trophy, CheckCircle, ExternalLink, Heart, Send
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, Video } from "../types";
+import { subscribeToSubscribersCount } from "../db";
 
 interface ProfileProps {
   profile: UserProfile;
@@ -41,9 +42,10 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
   const [showPayoutSaved, setShowPayoutSaved] = useState(false);
   const [showPartnerEmail, setShowPartnerEmail] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [liveSubCount, setLiveSubCount] = useState<number>(profile.subscribersCount || 0);
 
   // Synchronize state when target user profile props change
-  React.useEffect(() => {
+  useEffect(() => {
     setUsername(profile.username);
     setChannelName(profile.channelName);
     setChannelUrl(profile.channelUrl);
@@ -63,8 +65,18 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
     profile.paypal
   ]);
 
+  // Real-time direct snapshot listener on followers count:
+  useEffect(() => {
+    if (profile?.email) {
+      const unsub = subscribeToSubscribersCount(profile.email, (count) => {
+        setLiveSubCount(count);
+      });
+      return () => unsub();
+    }
+  }, [profile?.email]);
+
   // Real-time calculation from user profile and videos
-  const realSubsCount = profile.subscribersCount || 0;
+  const realSubsCount = liveSubCount;
   const realTotalLikes = userVideos.reduce((acc, v) => acc + (v.likes || 0), 0);
   const realWatchHrs = userVideos.reduce((acc, v) => acc + (((v.duration || 0) * (v.views || 0)) / 3600), 0);
   const watchHrsDisp = Math.floor(realWatchHrs); 
