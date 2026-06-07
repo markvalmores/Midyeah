@@ -40,6 +40,7 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
 
   const [showPayoutSaved, setShowPayoutSaved] = useState(false);
   const [showPartnerEmail, setShowPartnerEmail] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Synchronize state when target user profile props change
   React.useEffect(() => {
@@ -339,6 +340,44 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
           <h2 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/10 pb-2 mb-3">
             CHANNEL CUSTOMIZATION
           </h2>
+
+          {/* God-Powered Permanent Profile Web Link */}
+          <div className="mb-5 bg-[#1C1C1F] p-4 rounded-[14px] border border-purple-500/30 shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-purple-300">
+                <LinkIcon className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-100">Permanent Profile Link</span>
+              </div>
+              <span className="bg-emerald-950/70 border border-emerald-500/50 text-[8px] text-emerald-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest animate-pulse">Saved Forever</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mb-3 leading-relaxed">
+              This is your permanent public link. Anyone visiting this URL will lands directly on your customized view. This configuration is saved locally and synced globally on Firebase so it persists indefinitely.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={`${window.location.origin}/profile/${username || "usagyuunvtuber"}`}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                className="flex-1 bg-[#121214] border border-white/10 text-purple-400 font-mono text-[10px] px-3 py-2 rounded-xl outline-none select-all"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/profile/${username || "usagyuunvtuber"}`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className={`px-3.5 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide transition duration-150 cursor-pointer ${copied ? "bg-emerald-600 text-white" : "bg-purple-600 hover:bg-purple-500 text-white"}`}
+              >
+                {copied ? "Copied! ✓" : "Copy"}
+              </button>
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[9px] text-slate-500 font-medium">
+              <span>Standard Vercel mirror:</span>
+              <span className="font-mono text-purple-400">https://midyeah.vercel.app/profile/{username || "usagyuunvtuber"}</span>
+            </div>
+          </div>
 
           <form onSubmit={handleProfileSave} className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

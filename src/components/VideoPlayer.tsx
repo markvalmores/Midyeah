@@ -23,9 +23,10 @@ interface VideoPlayerProps {
   onVideoEnd?: () => void;
   onNext?: () => void;
   onSetTab?: (tab: string) => void;
+  onViewCreator?: (creator: UserProfile) => void;
 }
 
-export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd, onNext, onSetTab }: VideoPlayerProps) {
+export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd, onNext, onSetTab, onViewCreator }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -977,15 +978,18 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
         {/* Video Creator Profile Section */}
         <div className="flex items-center justify-between gap-4 bg-purple-950/10 p-3 rounded-xl border border-purple-950/20 mt-1">
-          <div className="flex items-center gap-3">
+          <button 
+            onClick={() => onViewCreator && onViewCreator(video.creator)}
+            className="flex items-center gap-3 text-left focus:outline-none focus:ring-1 focus:ring-purple-500 rounded-lg p-1 hover:bg-white/5 transition cursor-pointer"
+          >
             <div className="w-10 h-10 rounded-full overflow-hidden bg-purple-800/60 border border-purple-500">
               <img src={video.creator.avatarUrl} alt="Avatar" className="w-full h-full object-cover" onError={(e)=>{(e.target as any).src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80"}} referrerPolicy="no-referrer" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-gray-100">{video.creator.channelName}</h3>
+              <h3 className="font-bold text-sm text-gray-100 hover:text-purple-300 transition-colors">{video.creator.channelName}</h3>
               <p className="text-[10px] text-purple-400">{video.creator.username} • {video.creator.subscribersCount} subscribers</p>
             </div>
-          </div>
+          </button>
 
           <div className="flex items-center gap-2">
             <button

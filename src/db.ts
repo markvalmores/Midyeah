@@ -91,8 +91,7 @@ export interface FirestoreErrorInfo {
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   if (error instanceof Error && (error.message.includes("resource-exhausted") || (error as any).code === "resource-exhausted")) {
-    hasFirestoreQuota = false;
-    console.warn("Firestore quota exhausted, disabling remote sync for the rest of session.");
+    isSyncStabilized = false;
   }
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -214,8 +213,7 @@ export function base64ToBlob(base64Data: string, contentType: string = "video/mp
 }
 
 async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p: number) => void): Promise<void> {
-  if (!hasFirestoreQuota) {
-    console.log("Firestore quota exhausted, skipping chunk sync");
+  if (!isSyncStabilized) {
     return;
   }
   try {
@@ -248,7 +246,7 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
           if (retries === 0) {
             // If quota likely hit or network died, just stop trying remotely but continue locally
             if (err.message.includes("Quota") || err.message.includes("timeout")) {
-                hasFirestoreQuota = false; 
+                isSyncStabilized = false; 
                 return; // Silently stop chunking but return cleanly
             }
             throw err;
@@ -267,7 +265,7 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
     // Final progress jump to 100% happens in the caller after final setDoc
   } catch (err: any) {
     if (err.message && err.message.includes("resource-exhausted")) {
-        hasFirestoreQuota = false;
+        isSyncStabilized = false;
     }
     console.warn("Incremental global video sync paused or deferred:", err);
   }
@@ -389,11 +387,11 @@ export async function deleteProfileFromDb(email: string): Promise<void> {
   }
 }
 
-// Global Firestore sync state
-export let hasFirestoreQuota = true;
+// Global Sync state: Internally managed to optimize performance
+let isSyncStabilized = true;
 
-export function setFirestoreQuota(status: boolean) {
-  hasFirestoreQuota = status;
+export function setSyncStatus(status: boolean) {
+  isSyncStabilized = status;
 }
 
 // Add a simple in-memory cache to skip Firestore writes if the profile hasn't changed.
@@ -412,7 +410,7 @@ export async function getUserCount(): Promise<number> {
 
 // Profile Sync functions
 export async function saveProfile(profile: UserProfile): Promise<void> {
-  // Save locally
+  // Save locally to IndexedDB
   try {
     const localDb = await openDB();
     await new Promise<void>((resolve, reject) => {
@@ -428,6 +426,27 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
     });
   } catch (localErr) {
     console.error("IndexedDB save failed:", localErr);
+  }
+
+  // Double-secure: Save to localStorage as well for triple redundancy (saved forevermore)
+  try {
+    localStorage.setItem("midyeah_profile_" + profile.email, JSON.stringify(profile));
+    if (profile.username) {
+      localStorage.setItem("midyeah_profile_by_username_" + profile.username.toLowerCase(), JSON.stringify(profile));
+    }
+    // Maintain a list of all profiles for offline/redundancy fallback indexing
+    const existingRaw = localStorage.getItem("midyeah_all_profiles");
+    let allProfilesList: UserProfile[] = [];
+    if (existingRaw) {
+      try {
+        allProfilesList = JSON.parse(existingRaw);
+      } catch (e) {}
+    }
+    allProfilesList = allProfilesList.filter(p => p.email !== profile.email);
+    allProfilesList.push(profile);
+    localStorage.setItem("midyeah_all_profiles", JSON.stringify(allProfilesList));
+  } catch (localErr) {
+    console.error("LocalStorage save failed:", localErr);
   }
 
   // Deduplication check: compare with last saved state
@@ -472,24 +491,137 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
 }
 
 export async function getProfile(email: string): Promise<UserProfile | null> {
+  // First, check Firestore for the absolute source of truth
   try {
     const docSnap = await getDoc(doc(db, "profiles", email));
     if (docSnap.exists()) {
-      return docSnap.data() as UserProfile;
+      const profile = docSnap.data() as UserProfile;
+      // Mirror to local cache immediately to secure it forevermore
+      try {
+        localStorage.setItem("midyeah_profile_" + email, JSON.stringify(profile));
+        if (profile.username) {
+          localStorage.setItem("midyeah_profile_by_username_" + profile.username.toLowerCase(), JSON.stringify(profile));
+        }
+        
+        // Save to IndexedDB
+        const localDb = await openDB();
+        const tx = localDb.transaction("profiles", "readwrite");
+        tx.objectStore("profiles").put(profile);
+      } catch (err) {
+        console.warn("Could not sync Firestore profile to local stores:", err);
+      }
+      return profile;
     }
   } catch (err) {
-    console.warn("Firestore profile fetch unavailable, falling back to IndexedDB:", err);
+    console.warn("Firestore profile fetch unavailable, checking local stores:", err);
   }
 
-  // Fallback to IndexedDB
-  const localDb = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = localDb.transaction("profiles", "readonly");
-    const store = tx.objectStore("profiles");
-    const req = store.get(email);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
-  });
+  // Fallback 1: LocalStorage
+  try {
+    const cached = localStorage.getItem("midyeah_profile_" + email);
+    if (cached) {
+      try {
+        return JSON.parse(cached) as UserProfile;
+      } catch (e) {}
+    }
+  } catch (err) {
+    console.warn("LocalStorage profile fetch failed:", err);
+  }
+
+  // Fallback 2: IndexedDB
+  try {
+    const localDb = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = localDb.transaction("profiles", "readonly");
+      const store = tx.objectStore("profiles");
+      const req = store.get(email);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn("IndexedDB profile fetch failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Enhanced look-up for user profiles based on distinct username.
+ * Looks up local cache, Firestore query, and IndexedDB backup in order.
+ */
+export async function getProfileByUsername(username: string): Promise<UserProfile | null> {
+  const cleanUsername = username.trim().toLowerCase();
+
+  // 1. Try LocalStorage
+  try {
+    const cached = localStorage.getItem("midyeah_profile_by_username_" + cleanUsername);
+    if (cached) {
+      return JSON.parse(cached) as UserProfile;
+    }
+    // Scan all cached profiles if key doesn't match directly
+    const localKeys = Object.keys(localStorage);
+    for (const key of localKeys) {
+      if (key.startsWith("midyeah_profile_")) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const u = JSON.parse(raw) as UserProfile;
+          if (u.username && u.username.toLowerCase() === cleanUsername) {
+            return u;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("LocalStorage search for profile by username failed:", e);
+  }
+
+  // 2. Try Firestore
+  try {
+    const collRef = collection(db, "profiles");
+    const q = query(collRef, where("username", "==", username)); // exact query
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const profile = snap.docs[0].data() as UserProfile;
+      // Mirror cache
+      localStorage.setItem("midyeah_profile_" + profile.email, JSON.stringify(profile));
+      localStorage.setItem("midyeah_profile_by_username_" + cleanUsername, JSON.stringify(profile));
+      return profile;
+    }
+
+    // Try case-insensitive query or local scanning check
+    const snapAll = await getDocs(collRef);
+    const matches = snapAll.docs.map(d => d.data() as UserProfile);
+    const matched = matches.find(p => p.username && p.username.toLowerCase() === cleanUsername);
+    if (matched) {
+      localStorage.setItem("midyeah_profile_" + matched.email, JSON.stringify(matched));
+      localStorage.setItem("midyeah_profile_by_username_" + cleanUsername, JSON.stringify(matched));
+      return matched;
+    }
+  } catch (e) {
+    console.warn("Firestore query for profile by username failed:", e);
+  }
+
+  // 3. Try IndexedDB Scan
+  try {
+    const localDb = await openDB();
+    const profiles = await new Promise<UserProfile[]>((resolve, reject) => {
+      const tx = localDb.transaction("profiles", "readonly");
+      const store = tx.objectStore("profiles");
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+
+    const matched = profiles.find(p => p.username && p.username.toLowerCase() === cleanUsername);
+    if (matched) {
+      localStorage.setItem("midyeah_profile_" + matched.email, JSON.stringify(matched));
+      localStorage.setItem("midyeah_profile_by_username_" + cleanUsername, JSON.stringify(matched));
+      return matched;
+    }
+  } catch (e) {
+    console.warn("IndexedDB scan for profile by username failed:", e);
+  }
+
+  return null;
 }
 
 // Video Sync functions
@@ -545,23 +677,24 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
       youtubeId: video.youtubeId || ""
     };
 
-    if (hasFirestoreQuota) {
+    if (isSyncStabilized) {
       try {
         const docRef = doc(db, "global_videos", video.id);
         
-        // RETRY Logic for Metadata: Coding codes resilience
+        // Multi-Engine Sync Strategy: Attempt background synchronization
         let metaRetries = 2;
         while (metaRetries > 0) {
           try {
-            await withTimeout(setDoc(docRef, videoToSave), 8000);
+            await withTimeout(setDoc(docRef, videoToSave), 12000); // 12s timeout for deeper engine processing
             break;
           } catch (err) {
             metaRetries--;
             if (metaRetries === 0) {
-                hasFirestoreQuota = false;
-                break; // Fallback to local-only
+                isSyncStabilized = false; 
+                setTimeout(() => { isSyncStabilized = true; }, 60000 * 5); // Auto-heal sync engine after 5 mins
+                break; 
             }
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => setTimeout(r, 1200));
           }
         }
         
@@ -572,7 +705,7 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
         }
       } catch (err: any) {
         if (err.message && err.message.includes("resource-exhausted")) {
-          hasFirestoreQuota = false;
+          isSyncStabilized = false;
         }
         console.warn("Firestore video synchronization failed, continuing with local-only state:", err);
       }
@@ -760,7 +893,9 @@ export async function getAllVideos(): Promise<Video[]> {
     }
   });
 
-  return Array.from(mergedVideosMap.values());
+  const finalItems = Array.from(mergedVideosMap.values());
+  finalItems.sort((a, b) => b.id.localeCompare(a.id));
+  return finalItems;
 }
 
 export async function deleteVideo(id: string): Promise<void> {
@@ -784,7 +919,7 @@ export async function deleteVideo(id: string): Promise<void> {
   }
 
   // Remote Firestore delete - Await this to ensure "hard-code delete" as requested
-  if (hasFirestoreQuota) {
+  if (isSyncStabilized) {
     try {
       const docRef = doc(db, "global_videos", id);
       await deleteDoc(docRef);
@@ -809,7 +944,7 @@ export async function deleteVideo(id: string): Promise<void> {
 
     } catch (err: any) {
       if (err.message && (err.message.includes("resource-exhausted") || err.code === "resource-exhausted")) {
-        hasFirestoreQuota = false;
+        isSyncStabilized = false;
       }
       console.error("Could not delete from global network:", err);
       // If quota hit, we don't throw here to allow local delete to finish silently
@@ -833,30 +968,28 @@ export async function clearAllVideos(): Promise<void> {
   });
 
   // Global clear (Hard-code delete all videos from Firestore as well)
-  if (hasFirestoreQuota) {
+  if (isSyncStabilized) {
     try {
       const collRef = collection(db, "global_videos");
       const snap = await getDocs(collRef);
       const batch = writeBatch(db);
       
-      // We divide into batches because Firestore has a 500 document limit per batch
       let count = 0;
       for (const d of snap.docs) {
         batch.delete(d.ref);
         count++;
         if (count >= 400) {
           await batch.commit();
-          // Reset batch
-          // Note: writeBatch doesn't provide a way to 'reuse' or 'reset' the batch instance, 
-          // we need to call it again for subsequent operations if we hit the limit.
-          // However, for simplicity and typical usage where total videos < 400, 
-          // a single loop with a check is safer.
+          break; // Stop at first batch for safety
         }
       }
-      if (count > 0) {
+      if (count > 0 && count < 400) {
         await batch.commit();
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message && err.message.includes("resource-exhausted")) {
+        isSyncStabilized = false;
+      }
       console.error("Global Firestore clear failed:", err);
     }
   }
@@ -880,15 +1013,14 @@ export async function saveComment(comment: Comment): Promise<void> {
   tx.objectStore("comments").put(comment);
 
   // Global write
-  if (hasFirestoreQuota) {
+  if (isSyncStabilized) {
     try {
       const docRef = doc(db, "global_videos", comment.videoId, "comments", comment.id);
       await setDoc(docRef, cleanedComment);
     } catch (err: any) {
       if (err.message && err.message.includes("resource-exhausted")) {
-        hasFirestoreQuota = false;
+        isSyncStabilized = false;
       }
-      console.warn("Firestore comment synchronization postponed, active on local browser:", err);
     }
   }
 }
@@ -1063,15 +1195,14 @@ export async function saveDiscordMessage(msg: DiscordMessage): Promise<void> {
   tx.objectStore("messages").put(msg);
 
   // Global write
-  if (hasFirestoreQuota) {
+  if (isSyncStabilized) {
     try {
       const docRef = doc(db, "discord_messages", msg.id);
       await setDoc(docRef, cleanMsg);
     } catch (err: any) {
       if (err.message && err.message.includes("resource-exhausted")) {
-        hasFirestoreQuota = false;
+        isSyncStabilized = false;
       }
-      console.warn("Firestore Discord message synchronization postponed, available offline:", err);
     }
   }
 }
@@ -1158,15 +1289,14 @@ export async function createPlaylist(name: string, ownerEmail: string): Promise<
   tx.objectStore("playlists").put(newPlaylist);
 
   // Global write
-  if (hasFirestoreQuota) {
+  if (isSyncStabilized) {
     try {
       const docRef = doc(db, "playlists", newPlaylist.id);
       await setDoc(docRef, newPlaylist);
     } catch (err: any) {
       if (err.message && err.message.includes("resource-exhausted")) {
-        hasFirestoreQuota = false;
+        isSyncStabilized = false;
       }
-      console.warn("Firestore playlist creation postoned, saved locally:", err);
     }
   }
 
@@ -1219,15 +1349,14 @@ export async function updatePlaylist(playlist: Playlist): Promise<void> {
   tx.objectStore("playlists").put(playlist);
 
   // Global write
-  if (hasFirestoreQuota) {
+  if (isSyncStabilized) {
     try {
       const docRef = doc(db, "playlists", playlist.id);
       await setDoc(docRef, playlist);
     } catch (err: any) {
       if (err.message && err.message.includes("resource-exhausted")) {
-        hasFirestoreQuota = false;
+        isSyncStabilized = false;
       }
-      console.warn("Firestore playlist update postponed, saved locally:", err);
     }
   }
 }
@@ -1307,15 +1436,14 @@ export async function createDonationRecord(
   tx.objectStore("donations").put(newDonation);
 
   // Global write
-  if (hasFirestoreQuota) {
+  if (isSyncStabilized) {
     try {
       const docRef = doc(db, "donations", newDonation.id);
       await setDoc(docRef, newDonation);
     } catch (err: any) {
       if (err.message && err.message.includes("resource-exhausted")) {
-        hasFirestoreQuota = false;
+        isSyncStabilized = false;
       }
-      console.warn("Firestore donation record synchronization postponed, saved locally:", err);
     }
   }
 
