@@ -90,6 +90,49 @@ async function startServer() {
     }
   });
 
+  app.post("/api/generate-theme", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ error: "Missing theme prompt" });
+      }
+      const systemInstruction = `You are a professional UX Designer and colorist.
+Generate a cohesive color palette for a Facebook Messenger style chat box based on the specified theme style prompt.
+The theme details MUST include matching hex variables suited for a dark UI background content.
+Ensure sufficient contrast against text!`;
+
+      const userPrompt = `Theme prompt: "${prompt}"`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: [
+          { role: "user", parts: [{ text: userPrompt }] }
+        ],
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              backgroundGradient: { type: Type.STRING, description: "A beautiful CSS linear-gradient matching the theme for the chat background panel" },
+              bubbleGradient: { type: Type.STRING, description: "A CSS linear-gradient for the sent message bubbles" },
+              bubbleText: { type: Type.STRING, description: "Color for text inside sent message bubbles, e.g. '#ffffff'" },
+              accentColor: { type: Type.STRING, description: "Hex color for active icons, buttons, badges" },
+              themeName: { type: Type.STRING, description: "A creative name for the theme" }
+            },
+            required: ["backgroundGradient", "bubbleGradient", "bubbleText", "accentColor", "themeName"]
+          }
+        }
+      });
+
+      const parsed = JSON.parse(response.text);
+      res.json(parsed);
+    } catch (error: any) {
+      console.error("Theme generation error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
   // Vite Middleware
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

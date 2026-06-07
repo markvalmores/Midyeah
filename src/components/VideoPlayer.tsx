@@ -9,6 +9,7 @@ import {
   FastForward, SkipForward, SkipBack, Square, Settings2,
   Tv, Subtitles, Compass, RefreshCw, ThumbsUp, ThumbsDown, Share2,
   Download, Eye, Video as VideoIcon, Compass as CompassIcon, HelpCircle, Cast, FolderHeart, WifiOff,
+  Award, Sparkles, Check, X, CreditCard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Video, VideoSub, UserProfile } from "../types";
@@ -16,8 +17,10 @@ import {
   savePlayOffset, getPlayOffset, saveVideo, toggleSubscription, 
   checkSubscriptionStatus, toggleGroupMembership, checkGroupStatus, 
   saveLikeDislikeStatus, getLikeDislikeStatus, saveVideoReactionStatus, 
-  getVideoReactionStatus, isGuestAccount, atomicIncrementVideoView
+  getVideoReactionStatus, isGuestAccount, atomicIncrementVideoView,
+  db
 } from "../db";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 interface VideoPlayerProps {
   video: Video;
@@ -29,9 +32,10 @@ interface VideoPlayerProps {
   onNext?: () => void;
   onSetTab?: (tab: string) => void;
   onViewCreator?: (creator: UserProfile) => void;
+  onJoinGroupChat?: (creator: UserProfile) => void;
 }
 
-export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd, onNext, onSetTab, onViewCreator }: VideoPlayerProps) {
+export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibrary, isDownloaded, onVideoEnd, onNext, onSetTab, onViewCreator, onJoinGroupChat }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,6 +72,15 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   const [hasRated, setHasRated] = useState<"like" | "dislike" | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isGroupMember, setIsGroupMember] = useState(false);
+  
+  // Premium Creator Memberships states (Membership+)
+  const [isMemberPlus, setIsMemberPlus] = useState(false);
+  const [showMembershipModal, setShowMembershipModal] = useState(false);
+  const [creatorProfile, setCreatorProfile] = useState<UserProfile | null>(null);
+  const [activePaymentMethod, setActivePaymentMethod] = useState<"gcash" | "paypal">("gcash");
+  const [paymentGcashRef, setPaymentGcashRef] = useState("");
+  const [paymentPaypalEmail, setPaymentPaypalEmail] = useState("");
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Keep reactions and views counts in sync when the video prop is updated in real-time
   useEffect(() => {
@@ -119,6 +132,39 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
             const groupId = video.creator.channelUrl || "midyeah_group";
             const joined = await checkGroupStatus(effectiveEmail, groupId);
             if (isMounted) setIsGroupMember(joined);
+
+            // Fetch live membership status
+            try {
+              const mDocId = `${effectiveEmail}_to_${video.creator.email}`;
+              const docRef = doc(db, "memberships", mDocId);
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists() && docSnap.data().status === "active" && isMounted) {
+                setIsMemberPlus(true);
+              } else if (isMounted) {
+                setIsMemberPlus(false);
+              }
+            } catch (err) {
+              console.warn("Could not check real-time membership status:", err);
+            }
+
+            // Fetch latest real-time creator profile with true bindings
+            try {
+              const creatorRef = doc(db, "profiles", video.creator.email);
+              const creatorSnap = await getDoc(creatorRef);
+              if (creatorSnap.exists() && isMounted) {
+                const cData = creatorSnap.data() as UserProfile;
+                setCreatorProfile(cData);
+                // Also update the active payment tab automatically based on what is available
+                if (!cData.gcash && cData.paypal && isMounted) {
+                  setActivePaymentMethod("paypal");
+                }
+              } else if (isMounted) {
+                setCreatorProfile(video.creator);
+              }
+            } catch (err) {
+              console.warn("Could not load latest creator profile:", err);
+              if (isMounted) setCreatorProfile(video.creator);
+            }
           }
         } catch (e) {
           console.warn("Status synchronization failed:", e);
@@ -1193,7 +1239,11 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
                   setIsGroupMember(status);
                   if (status) {
                     alert(`✨ Joined ${video.creator.channelName}'s group! Redirecting to group chat...`);
-                    if (onSetTab) onSetTab("community");
+                    if (onJoinGroupChat) {
+                      onJoinGroupChat(video.creator);
+                    } else if (onSetTab) {
+                      onSetTab("community");
+                    }
                   } else {
                     alert(`⭕ Left ${video.creator.channelName}'s group.`);
                   }
@@ -1207,6 +1257,24 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
             >
               {isGroupMember ? "In Group" : "Join Group"}
             </button>
+            <button
+              onClick={() => {
+                if (!currUser) {
+                  alert("Please sign in to join Membership+!");
+                  return;
+                }
+                if (isGuestAccount(currUser.email)) {
+                  alert("Restricted: Guest accounts cannot buy premium subscriptions.");
+                  return;
+                }
+                setShowMembershipModal(true);
+              }}
+              className={`${isMemberPlus ? "bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 border border-yellow-400 text-white font-bold" : "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold"} flex items-center justify-center gap-1 text-xs px-3.5 py-1.5 rounded-full shadow-lg hover:shadow-purple-500/10 cursor-pointer transition`}
+              id="membership-plus-btn"
+            >
+              <Award className={`w-3.5 h-3.5 ${isMemberPlus ? "animate-pulse text-yellow-200" : "text-purple-200"}`} />
+              <span>{isMemberPlus ? "Member+ Active" : "Membership+"}</span>
+            </button>
           </div>
         </div>
 
@@ -1216,6 +1284,222 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
           <p className="mt-1 whitespace-pre-wrap">{video.description}</p>
         </div>
       </div>
+
+      {/* Dynamic Membership+ Payment Modal Prompt */}
+      <AnimatePresence>
+        {showMembershipModal && (
+          <div className="absolute inset-0 z-50 bg-[#000000e0] backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#15161c] border-2 border-yellow-500/30 rounded-2xl w-full max-w-md overflow-hidden text-white shadow-2xl relative"
+            >
+              <div className="p-4 bg-gradient-to-r from-yellow-700/20 via-slate-900 to-yellow-700/20 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-yellow-500 animate-bounce" />
+                  <span className="font-extrabold text-sm text-yellow-400 tracking-wide uppercase">Membership+ Premium Join</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowMembershipModal(false);
+                    setPaymentGcashRef("");
+                    setPaymentPaypalEmail("");
+                  }}
+                  className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 text-left">
+                <div className="text-center pb-2 border-b border-white/5">
+                  <p className="text-[11px] text-gray-400">Supporting Creator:</p>
+                  <h4 className="text-md font-bold text-gray-100">{creatorProfile?.channelName || video.creator.channelName}</h4>
+                  <p className="text-[10px] text-purple-400">@{creatorProfile?.username || video.creator.username}</p>
+                </div>
+
+                <div className="bg-yellow-950/20 border border-yellow-500/20 rounded-xl p-3 text-center space-y-1">
+                  <span className="text-[10px] uppercase text-yellow-500 font-bold tracking-widest block">Monthly Price Contribution</span>
+                  <span className="text-2xl font-extrabold text-yellow-300">₱50.00 <span className="text-xs font-normal text-gray-400">PHP / monthly</span></span>
+                  <p className="text-[10px] text-gray-300">Unlocks premium exclusive member badges, elite community priority, and live chat sparkle highlights!</p>
+                </div>
+
+                {/* Tab switchers: GCash & PayPal */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActivePaymentMethod("gcash")}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${activePaymentMethod === "gcash" ? "bg-blue-600 text-white shadow-md font-bold" : "bg-white/5 border border-white/5 text-gray-400 hover:text-white"}`}
+                  >
+                    <span className="font-mono text-[11px] font-extrabold uppercase italic">G</span>
+                    <span>GCash Payment</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePaymentMethod("paypal")}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${activePaymentMethod === "paypal" ? "bg-slate-800 text-white shadow-md border border-white/10" : "bg-white/5 border border-white/5 text-gray-400 hover:text-white"}`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5 text-blue-400" />
+                    <span>PayPal Address</span>
+                  </button>
+                </div>
+
+                {/* Sub panels rendering GCash vs PayPal bindings */}
+                <div className="space-y-3.5">
+                  {activePaymentMethod === "gcash" ? (
+                    <div className="space-y-3">
+                      {creatorProfile?.gcash ? (
+                        <div className="space-y-2 bg-blue-950/10 border border-blue-500/20 p-3.5 rounded-xl">
+                          <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">📱 Saved Payout Account Details:</p>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-[9px] text-gray-400 uppercase block font-semibold">GCash Receiver Number</span>
+                              <span className="text-sm font-bold text-white font-mono">{creatorProfile.gcash}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(creatorProfile.gcash || "");
+                                alert("📋 GCash number copied to clipboard!");
+                              }}
+                              className="px-2 py-1 bg-blue-600/30 border border-blue-500/40 hover:bg-blue-600 hover:text-white rounded text-[10px] font-bold text-blue-300 cursor-pointer transition select-none"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          
+                          <div className="pt-2 border-t border-white/5">
+                            <label className="block text-[10px] text-slate-300 font-bold mb-1 font-sans">YOUR GCASH REFERENCE ID / SENDER MOBILE</label>
+                            <input 
+                              type="text"
+                              value={paymentGcashRef}
+                              onChange={(e) => setPaymentGcashRef(e.target.value)}
+                              placeholder="e.g. Ref No. or Gcash Number"
+                              className="w-full bg-[#1c1c24] border border-white/10 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 font-mono"
+                            />
+                            <p className="text-[8px] text-gray-400 mt-1 leading-relaxed">Please send exactly 50 pesos directly to GCash first and type reference code above.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-red-950/30 border border-red-500/20 p-4 rounded-xl text-center space-y-2">
+                          <p className="text-xs font-bold text-red-400 uppercase tracking-widest font-mono">⚠️ GCash Unavailable</p>
+                          <p className="text-[10px] text-slate-300 leading-relaxed font-sans">
+                            This user does not have a GCash saved under their binding settings. Please try checking their PayPal option above instead.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {creatorProfile?.paypal ? (
+                        <div className="space-y-2 bg-slate-900 border border-white/10 p-3.5 rounded-xl">
+                          <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">💳 PayPal Payout Email Address:</p>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-[9px] text-gray-400 uppercase block font-semibold">PayPal Registered Email</span>
+                              <span className="text-xs font-bold text-white font-mono">{creatorProfile.paypal}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(creatorProfile.paypal || "");
+                                alert("📋 PayPal email address copied to clipboard!");
+                              }}
+                              className="px-2 py-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded text-[10px] font-bold text-gray-300 cursor-pointer transition select-none"
+                            >
+                              Copy
+                            </button>
+                          </div>
+
+                          <div className="pt-2 border-t border-white/5">
+                            <label className="block text-[10px] text-slate-300 font-bold mb-1 font-sans">YOUR PAYPAL EMAIL / TRANSACTION ID</label>
+                            <input 
+                              type="text"
+                              value={paymentPaypalEmail}
+                              onChange={(e) => setPaymentPaypalEmail(e.target.value)}
+                              placeholder="e.g. yourpaypal@email.com"
+                              className="w-full bg-[#1c1c24] border border-white/10 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 font-mono"
+                            />
+                            <p className="text-[8px] text-gray-400 mt-1 leading-relaxed">Please transfer exactly ₱50.00 to the PayPal address above first and type transaction id.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-red-950/30 border border-red-500/20 p-4 rounded-xl text-center space-y-2">
+                          <p className="text-xs font-bold text-red-400 uppercase tracking-widest font-mono">⚠️ PayPal Unavailable</p>
+                          <p className="text-[10px] text-slate-300 leading-relaxed font-sans">
+                            This user haven't bind their PayPal account yet. Please try checking their GCash option above instead.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Action CTA Submission buttons */}
+                <div className="pt-3 border-t border-white/5">
+                  <button
+                    type="button"
+                    disabled={
+                      isSubmittingPayment ||
+                      (activePaymentMethod === "gcash" && !creatorProfile?.gcash) ||
+                      (activePaymentMethod === "paypal" && !creatorProfile?.paypal)
+                    }
+                    onClick={async () => {
+                      if (!currUser) return;
+                      
+                      // Validate entries
+                      if (activePaymentMethod === "gcash" && !paymentGcashRef.trim()) {
+                        alert("Please enter your GCash mobile number or transaction reference ID!");
+                        return;
+                      }
+                      if (activePaymentMethod === "paypal" && !paymentPaypalEmail.trim()) {
+                        alert("Please enter your sender PayPal email or Transaction reference ID!");
+                        return;
+                      }
+
+                      setIsSubmittingPayment(true);
+
+                      try {
+                        const mDocId = `${currUser.email}_to_${video.creator.email}`;
+                        const membershipDocRef = doc(db, "memberships", mDocId);
+                        
+                        // Save directly to the synchronized Firestore DB
+                        await setDoc(membershipDocRef, {
+                          id: mDocId,
+                          subscriberEmail: currUser.email,
+                          subscriberName: currUser.username || "Subscriber Member",
+                          creatorEmail: video.creator.email,
+                          creatorName: video.creator.channelName,
+                          paymentMethod: activePaymentMethod === "gcash" ? "GCash" : "PayPal",
+                          payoutReference: activePaymentMethod === "gcash" ? paymentGcashRef.trim() : paymentPaypalEmail.trim(),
+                          amount: 50,
+                          status: "active",
+                          timestamp: new Date().toISOString()
+                        });
+
+                        setIsMemberPlus(true);
+                        alert(`💎 Amen! God Bless! Your monthly Membership+ payment of ₱50 has been successfully synchronized onto ${video.creator.channelName}'s channel via ${activePaymentMethod === "gcash" ? "GCash (" + creatorProfile?.gcash + ")" : "PayPal (" + creatorProfile?.paypal + ")"}!`);
+                        
+                        setShowMembershipModal(false);
+                        setPaymentGcashRef("");
+                        setPaymentPaypalEmail("");
+                      } catch (err: any) {
+                        alert("Database configuration sync issue: " + err.message);
+                      } finally {
+                        setIsSubmittingPayment(false);
+                      }
+                    }}
+                    className="w-full bg-gradient-to-r from-yellow-600 via-amber-500 to-yellow-600 disabled:from-slate-800 disabled:to-slate-800 disabled:text-gray-500 hover:from-yellow-500 hover:to-amber-500 text-white text-xs font-black uppercase tracking-wider py-2.5 rounded-xl transition cursor-pointer shadow-lg shadow-yellow-800/10"
+                  >
+                    {isSubmittingPayment ? "Registering Supporter..." : "Subscribe to Membership+"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

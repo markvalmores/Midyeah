@@ -154,6 +154,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // 4b. Profile Group Messages
+    match /group_messages/{messageId} {
+      allow read: if true;
+      allow create: if isSignedIn() && !isGuest() && isValidId(messageId) && isValidDiscordMessage(request.resource.data) && request.resource.data.groupId is string;
+      allow update, delete: if false;
+    }
+
     // 5. Saved Custom Curator Playlists
     match /playlists/{playlistId} {
       allow read: if isSignedIn();
@@ -177,13 +184,13 @@ service cloud.firestore {
     // 7. Subscriptions mappings
     match /subscriptions/{subId} {
       allow read: if true;
-      allow create, delete: if isSignedIn() && !isGuest() && isValidId(subId);
+      allow create, update, delete: if isSignedIn() && !isGuest() && isValidId(subId);
     }
 
     // 8. Group Memberships
     match /group_memberships/{membershipId} {
       allow read: if true;
-      allow create, delete: if isSignedIn() && !isGuest() && isValidId(membershipId);
+      allow create, update, delete: if isSignedIn() && !isGuest() && isValidId(membershipId);
     }
 
     // 9. Persistent Likes/Dislikes
@@ -198,6 +205,55 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if isSignedIn() && !isGuest() && isValidId(reactId) && isValidVideoReaction(request.resource.data);
       allow delete: if isSignedIn() && !isGuest() && isValidId(reactId);
+    }
+
+    // 11. Messenger Private/Group Messages
+    match /messenger_messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && !isGuest() && isValidId(messageId);
+      allow update: if false;
+      allow delete: if isSignedIn() && !isGuest() && isValidId(messageId);
+    }
+
+    // 12. Messenger Chat Custom Settings
+    match /messenger_settings/{settingId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && !isGuest() && isValidId(settingId);
+      allow delete: if false;
+    }
+
+    // 13. Messenger Connections / Friendships
+    match /friendships/{friendId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && !isGuest() && isValidId(friendId);
+      allow delete: if isSignedIn() && !isGuest() && isValidId(friendId);
+    }
+
+    // 14. Messenger Group Chats Circles
+    match /group_chats/{groupId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && !isGuest() && isValidId(groupId);
+      allow delete: if isSignedIn() && !isGuest() && isValidId(groupId);
+    }
+
+    // 15. Creator Premium Memberships (Membership+)
+    match /memberships/{membershipId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && !isGuest() && isValidId(membershipId);
+      allow delete: if isSignedIn() && !isGuest() && isValidId(membershipId);
+    }
+
+    // 16. Members+ Exclusive Feed
+    match /members_plus_posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && !isGuest() && isValidId(postId);
+      allow update, delete: if isSignedIn() && !isGuest() && isValidId(postId) && (request.auth.token.email == resource.data.authorEmail);
+    }
+
+    // 17. Members+ Community Settings (Wallpaper, etc.)
+    match /members_plus_settings/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && !isGuest() && (request.auth.token.email == userId);
     }
 
   }

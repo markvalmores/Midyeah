@@ -149,7 +149,7 @@ validateConnection();
 
 // IndexedDB fallbacks for high-fidelity offline downloads
 const DB_NAME = "MidYeahDB";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export async function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -194,6 +194,11 @@ export async function openDB(): Promise<IDBDatabase> {
       // Store transparent donation audit records
       if (!db.objectStoreNames.contains("donations")) {
         db.createObjectStore("donations", { keyPath: "id" });
+      }
+
+      // Store custom group page wallpapers
+      if (!db.objectStoreNames.contains("group_wallpapers")) {
+        db.createObjectStore("group_wallpapers", { keyPath: "id" });
       }
     };
   });
@@ -1214,9 +1219,9 @@ export async function toggleSubscription(followerEmail: string, followedEmail: s
     if (subSnap.exists()) {
       // Unsubscribe
       batch.delete(subRef);
-      batch.update(profileRef, {
+      batch.set(profileRef, {
         subscribersCount: increment(-1)
-      });
+      }, { merge: true });
       isNowSubscribed = false;
     } else {
       // Subscribe
@@ -1225,9 +1230,9 @@ export async function toggleSubscription(followerEmail: string, followedEmail: s
         followedEmail,
         timestamp: new Date().toISOString()
       });
-      batch.update(profileRef, {
+      batch.set(profileRef, {
         subscribersCount: increment(1)
-      });
+      }, { merge: true });
       isNowSubscribed = true;
     }
     

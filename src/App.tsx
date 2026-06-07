@@ -33,16 +33,20 @@ import PlaylistsTab from "./components/PlaylistsTab";
 import SupportTab from "./components/SupportTab";
 import SearchTab from "./components/SearchTab";
 import DedicatedProfilePage from "./components/DedicatedProfilePage";
+import ProfileGroupPage from "./components/ProfileGroupPage";
 import WatchSection from "./components/WatchSection";
 import YoutubePortal from "./components/YoutubePortal";
 import { RentalPayment } from "./components/RentalPayment";
+import MembersPlusPage from "./components/MembersPlusPage";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "rooms" | "radio" | "community" | "profile" | "playlists" | "support" | "search" | "watch" | "youtube" | "profileGroup">("home");
   const [isCreatorMode, setIsCreatorMode] = useState(false); // Switch between Watcher and Creator mode
+  const [isMembersPlusMode, setIsMembersPlusMode] = useState(false); // Members+ Mode
   const [offlineMode, setOfflineMode] = useState(false); // Offline-Viewing only downloaded videos
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
   const [dedicatedProfileUser, setDedicatedProfileUser] = useState<UserProfile | null>(null);
+  const [activeGroupProfile, setActiveGroupProfile] = useState<UserProfile | null>(null);
 
   // Custom User Playlists
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
@@ -695,7 +699,7 @@ export default function App() {
       let offlineBlob = v.blob;
       
       // If no blob is available and it's a direct URL, try to fetch it
-      if (!offlineBlob && v.source === "url" && v.videoUrl) {
+      if (!offlineBlob && v.source === "local" && v.videoUrl) {
         try {
           const res = await fetch(v.videoUrl);
           if (res.ok) {
@@ -1107,7 +1111,15 @@ export default function App() {
               <span className="hidden md:inline">Videos</span>
             </button>
             <button
-              onClick={() => { setActiveTab("search"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); }}
+              onClick={() => { setIsMembersPlusMode(true); setActiveTab("home"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${isMembersPlusMode ? "bg-yellow-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
+              id="nav-tab-members-plus"
+            >
+              <Award className="w-4 h-4" />
+              <span className="hidden sm:inline">Members+</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab("search"); setCurrentVideo(null); setDedicatedProfileUser(null); window.history.pushState({}, "", "/"); setIsMembersPlusMode(false); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "search" ? "bg-purple-600 text-white shadow" : "text-gray-400 hover:text-white"}`}
               id="nav-tab-search"
             >
@@ -1805,6 +1817,10 @@ export default function App() {
                                   setDedicatedProfileUser(fresh || creator);
                                   setCurrentVideo(null);
                                 }}
+                                onJoinGroupChat={(creator) => {
+                                  setActiveGroupProfile(creator);
+                                  setActiveTab("profileGroup");
+                                }}
                               />
                             )}
 
@@ -2208,6 +2224,14 @@ export default function App() {
 
                   {activeTab === "community" && <DiscordChat currUser={currUser} />}
 
+                  {activeTab === "profileGroup" && activeGroupProfile && (
+                    <ProfileGroupPage 
+                      currUser={currUser} 
+                      groupProfile={activeGroupProfile}
+                      onBack={() => setActiveTab("home")}
+                    />
+                  )}
+
                 {activeTab === "profile" && currUser && (
                   <Profile 
                     profile={currUser} 
@@ -2225,6 +2249,10 @@ export default function App() {
           )}
 
         </AnimatePresence>
+
+        {isMembersPlusMode && currUser && (
+          <MembersPlusPage currUser={currUser} creatorProfile={currUser} />
+        )}
       </motion.main>
 
       {/* 3. HARDWARE CONSOLE HANDHELD CONTROLLER STYLE SHEETS */}
