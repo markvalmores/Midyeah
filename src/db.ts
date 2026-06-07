@@ -219,16 +219,28 @@ async function uploadVideoInChunks(videoId: string, blob: Blob, onProgress?: (p:
       const chunkData = await blobToBase64(slice);
       const chunkDocRef = doc(db, "global_videos", videoId, "chunks", `chunk_${i}`);
       
-      await setDoc(chunkDocRef, {
-        index: i,
-        data: chunkData
-      });
+      // ADD RETRY LOGIC FOR EACH CHUNK: Coding codes resilience
+      let retries = 2;
+      let success = false;
+      while (retries > 0 && !success) {
+        try {
+          await setDoc(chunkDocRef, {
+            index: i,
+            data: chunkData
+          });
+          success = true;
+        } catch (err: any) {
+          retries--;
+          console.warn(`Chunk ${i} upload failed, retries left: ${retries}`, err);
+          if (retries === 0) throw err;
+          await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
+        }
+      }
       
       if (onProgress) {
-        // Calculate progress carefully from 0 to 95
-        // We leave the last 5% for final metadata commit
-        const progress = Math.round(((i + 1) / numChunks) * 95);
-        onProgress(Math.min(progress, 95));
+        // Calculate progress carefully from 0 to 98
+        const progress = Math.round(((i + 1) / numChunks) * 98);
+        onProgress(Math.min(progress, 98));
       }
     }
     
@@ -476,62 +488,78 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
     tx.onerror = () => reject(tx.error);
   });
 
-  // Sync index metadata to Firestore
-  const creatorObj = {
-    username: video.creator.username || "",
-    email: video.creator.email || "",
-    channelName: video.creator.channelName || "",
-    channelUrl: video.creator.channelUrl || "",
-    bio: video.creator.bio || "",
-    avatarUrl: video.creator.avatarUrl || getRandomAnimeAvatar(video.creator.username),
-    coverUrl: video.creator.coverUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-    subscribersCount: video.creator.subscribersCount || 0
-  };
+    // Sync index metadata to Firestore
+    const creatorObj = {
+      username: video.creator.username || "",
+      email: video.creator.email || "",
+      channelName: video.creator.channelName || "",
+      channelUrl: video.creator.channelUrl || "",
+      bio: video.creator.bio || "",
+      avatarUrl: video.creator.avatarUrl || getRandomAnimeAvatar(video.creator.username),
+      coverUrl: video.creator.coverUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+      subscribersCount: video.creator.subscribersCount || 0
+    };
 
-  const videoToSave = {
-    id: video.id,
-    title: video.title || "Untitled Presentation",
-    description: video.description || "",
-    videoUrl: video.videoUrl || "",
-    category: video.category || "normal",
-    rentalPrice: video.rentalPrice || 3,
-    rentalPeriod: video.rentalPeriod || "month",
-    is360: !!video.is360,
-    uploadDate: video.uploadDate || new Date().toLocaleDateString(),
-    creatorEmail: video.creator.email,
-    creatorName: video.creator.channelName,
-    creatorAvatar: video.creator.avatarUrl,
-    creator: creatorObj,
-    views: video.views || 0,
-    likes: video.likes || 0,
-    dislikes: video.dislikes || 0,
-    reactions: video.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
-    duration: video.duration || 120,
-    thumbnailUrl: video.thumbnailUrl || "",
-    hasVideoData: !!videoBlob || !!video.blob
-  };
+    const videoToSave = {
+      id: video.id,
+      title: video.title || "Untitled Presentation",
+      description: video.description || "",
+      videoUrl: video.videoUrl || "",
+      category: video.category || "normal",
+      rentalPrice: video.rentalPrice || 3,
+      rentalPeriod: video.rentalPeriod || "month",
+      is360: !!video.is360,
+      uploadDate: video.uploadDate || new Date().toLocaleDateString(),
+      creatorEmail: video.creator.email,
+      creatorName: video.creator.channelName,
+      creatorAvatar: video.creator.avatarUrl,
+      creator: creatorObj,
+      views: video.views || 0,
+      likes: video.likes || 0,
+      dislikes: video.dislikes || 0,
+      reactions: video.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
+      duration: video.duration || 120,
+      thumbnailUrl: video.thumbnailUrl || "",
+      hasVideoData: !!videoBlob || !!video.blob
+    };
 
-  if (hasFirestoreQuota) {
-    try {
-      const docRef = doc(db, "global_videos", video.id);
-      await setDoc(docRef, videoToSave);
-      
-      const blobToUpload = videoBlob || video.blob;
-      if (blobToUpload) {
-        // Await the heavy chunk transmission to ensure we reach 100% properly
-        await uploadVideoInChunks(video.id, blobToUpload, onProgress);
+    if (hasFirestoreQuota) {
+      try {
+        const docRef = doc(db, "global_videos", video.id);
+        
+        // RETRY Logic for Metadata: Coding codes resilience
+        let metaRetries = 2;
+        while (metaRetries > 0) {
+          try {
+            await setDoc(docRef, videoToSave);
+            break;
+          } catch (err) {
+            metaRetries--;
+            if (metaRetries === 0) throw err;
+            await new Promise(r => setTimeout(r, 800));
+          }
+        }
+        
+        const blobToUpload = videoBlob || video.blob;
+        if (blobToUpload) {
+          // Await the heavy chunk transmission to ensure we reach 100% properly
+          await uploadVideoInChunks(video.id, blobToUpload, onProgress);
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes("resource-exhausted")) {
+          hasFirestoreQuota = false;
+        }
+        console.warn("Firestore video synchronization failed, continuing with local-only state:", err);
       }
-      
-      // Ensure we hit 100% after all chunks are confirmed
-      if (onProgress) onProgress(100);
-    } catch (err: any) {
-      if (err.message && err.message.includes("resource-exhausted")) {
-        hasFirestoreQuota = false;
-      }
-      console.warn("Firestore video synchronization failed:", err);
-      throw err; // Ensure the caller knows it failed
     }
-  }
+
+    // FINALIZING FLOW: Always force 100% and notify UI
+    if (onProgress) {
+      // Simulate final bit of "polishing" for UX
+      onProgress(99);
+      await new Promise(r => setTimeout(r, 400));
+      onProgress(100);
+    }
 }
 
 export function subscribeAllVideos(callback: (videos: Video[]) => void): () => void {

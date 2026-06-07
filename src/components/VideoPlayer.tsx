@@ -72,11 +72,14 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
       clearTimeout(controlsTimeoutRef.current);
     }
     setControlsVisible(true);
+    // If paused, keep controls visible indefinitely
+    if (!isPlaying) return;
+    
     controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
+      if (isPlaying && !showSettings) {
         setControlsVisible(false);
       }
-    }, 4000);
+    }, 5000); // 5 seconds visibility
   };
 
   useEffect(() => {
@@ -84,7 +87,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     return () => {
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
-  }, [isPlaying]);
+  }, [isPlaying, showSettings]);
 
   // Resume Watch persistence
   useEffect(() => {
@@ -463,14 +466,51 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
   // Progress Percentage for like vs dislike indicators
   const likeRatio = hasRated === "like" ? 82 : hasRated === "dislike" ? 42 : 68;
 
+  // Double Tap Seek for Mobile/Desktop Simulation
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    // If user clicked a real button, don't trigger seek
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select')) return;
+
+    resetControlsTimeout();
+    
+    // Check for double click/tap
+    if (e.detail === 2) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const x = e.clientX - rect.left;
+        if (x < rect.width / 2) {
+          skipTime(-10);
+        } else {
+          skipTime(10);
+        }
+      }
+    } else if (e.detail === 1) {
+      togglePlay();
+    }
+  };
+
   return (
     <div className={`flex flex-col ${isExpanded ? "w-full" : "lg:col-span-2"} bg-[#121214] text-slate-100 rounded-2xl overflow-hidden shadow-2xl border border-white/10`} ref={containerRef} 
-      onClick={() => {
-        resetControlsTimeout();
-        setShowSettings(false);
-      }}
+      onClick={handleOverlayClick}
       onMouseMove={resetControlsTimeout}
+      onMouseEnter={resetControlsTimeout}
     >
+      {/* Play/Pause Large Center Overlay for Mobile */}
+      <AnimatePresence>
+        {!isPlaying && controlsVisible && !crashState && (
+          <motion.button
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+            className="absolute inset-0 m-auto w-16 h-16 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center z-40 border border-white/20"
+          >
+            <Play className="w-8 h-8 text-white fill-white ml-1" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* Dynamic Player Screen Container */}
       <div className="relative group/player bg-black/90 aspect-video w-full flex items-center justify-center overflow-hidden">
         {crashState ? (
@@ -540,73 +580,81 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
         )}
 
         {/* Controls Overlay Panel */}
-        <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/50 to-transparent p-3 transition-opacity duration-300 flex flex-col gap-2 z-30 select-none ${controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 sm:p-4 transition-all duration-300 flex flex-col gap-2 z-30 select-none ${controlsVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 pointer-events-none"}`}>
           {/* Progress Slider */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-gray-300 font-mono">
+          <div className="flex items-center gap-2 group/seek">
+            <span className="text-[10px] text-gray-300 font-mono w-10 text-right">
               {formatTime(currentTime)}
             </span>
-            <input
-              type="range"
-              min={0}
-              max={duration || 100}
-              step={0.1}
-              value={currentTime}
-              onChange={handleSeek}
-              className="flex-1 accent-purple-500 h-1 bg-gray-700 rounded-lg cursor-pointer transition-all"
-              id="player-seek"
-            />
-            <span className="text-[10px] text-gray-300 font-mono">
+            <div className="flex-1 relative flex items-center h-6">
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                step={0.1}
+                value={currentTime}
+                onChange={handleSeek}
+                className="w-full accent-purple-500 h-1 sm:h-1.5 bg-gray-700/60 rounded-lg cursor-pointer transition-all hover:h-2"
+                id="player-seek"
+              />
+            </div>
+            <span className="text-[10px] text-gray-300 font-mono w-10">
               {formatTime(duration)}
             </span>
           </div>
 
           {/* Action buttons list */}
           <div className="flex items-center justify-between text-white text-xs">
-            <div className="flex items-center gap-3">
-              <button onClick={togglePlay} className="hover:text-purple-400 transition cursor-pointer" id="btn-play-pause">
-                {isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white" />}
+            <div className="flex items-center gap-2 sm:gap-4">
+              <button 
+                onClick={(e) => { e.stopPropagation(); togglePlay(); }} 
+                className="hover:text-purple-400 transition-all active:scale-95 p-1 cursor-pointer" 
+                id="btn-play-pause-controls"
+              >
+                {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white" />}
               </button>
 
-              <button
-                onClick={handleStop}
-                className="hover:text-purple-400 transition cursor-pointer"
-                id="btn-stop-vid"
-                title="Stop & Reset"
-              >
-                <Square className="w-4 h-4 fill-white/20" />
-              </button>
+              <div className="hidden sm:flex items-center gap-4">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleStop(); }}
+                  className="hover:text-purple-400 transition cursor-pointer p-1"
+                  id="btn-stop-vid"
+                  title="Stop & Reset"
+                >
+                  <Square className="w-4 h-4 fill-white/20" />
+                </button>
 
-              <button
-                onClick={() => skipTime(-10)}
-                className="hover:text-purple-400 transition cursor-pointer"
-                id="btn-back-10"
-                title="Back 10s"
-              >
-                <SkipBack className="w-4 h-4" />
-              </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); skipTime(-10); }}
+                  className="hover:text-purple-400 transition cursor-pointer p-1"
+                  id="btn-back-10"
+                  title="Back 10s"
+                >
+                  <SkipBack className="w-4 h-4 fill-white" />
+                </button>
 
-              <button
-                onClick={() => skipTime(10)}
-                className="hover:text-purple-400 transition cursor-pointer"
-                id="btn-forward-10"
-                title="Forward 10s"
-              >
-                <SkipForward className="w-4 h-4" />
-              </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); skipTime(10); }}
+                  className="hover:text-purple-400 transition cursor-pointer p-1"
+                  id="btn-forward-10"
+                  title="Forward 10s"
+                >
+                  <SkipForward className="w-4 h-4 fill-white" />
+                </button>
 
-              <button
-                onClick={onNext}
-                className="hover:text-purple-400 transition cursor-pointer"
-                id="btn-next-vid"
-                title="Next Video"
-              >
-                <FastForward className="w-4 h-4" />
-              </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onNext && onNext(); }}
+                  className="hover:text-purple-400 transition cursor-pointer p-1"
+                  id="btn-next-vid"
+                  title="Next Video"
+                >
+                  <FastForward className="w-4 h-4 fill-white" />
+                </button>
+              </div>
               
               <button
-                onClick={() => { if (videoRef.current) videoRef.current.currentTime = 0; }}
-                className="hover:text-purple-400 transition cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); if (videoRef.current) videoRef.current.currentTime = 0; }}
+                className="hover:text-purple-400 transition cursor-pointer p-1"
                 id="btn-restart-vid"
                 title="Restart"
               >
@@ -615,8 +663,8 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
               {/* Volume Slider combo */}
               <div className="flex items-center gap-1 group/vol">
-                <button onClick={toggleMute} className="hover:text-purple-400 transition cursor-pointer" id="btn-toggle-mute">
-                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                <button onClick={(e) => { e.stopPropagation(); toggleMute(); }} className="hover:text-purple-400 transition cursor-pointer p-1" id="btn-toggle-mute">
+                  {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                 </button>
                 <input
                   type="range"
@@ -625,20 +673,14 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
                   step={0.05}
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
-                  className="w-16 accent-purple-500 h-1 bg-gray-700/80 rounded cursor-pointer transition-all"
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-12 sm:w-20 accent-purple-500 h-1 bg-gray-700/80 rounded cursor-pointer transition-all opacity-0 group-hover/vol:opacity-100 sm:opacity-100"
                   id="player-volume"
                 />
               </div>
-
-              {/* Radio Indicator OR 360 compass identifier */}
-              {video.is360 && (
-                <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 bg-purple-900/60 rounded text-[10px] border border-purple-500/30 text-purple-300 animate-pulse">
-                  <CompassIcon className="w-3 h-3" /> Immersive 360° Playback Available
-                </div>
-              )}
             </div>
 
-            <div className="flex items-center gap-3 relative">
+            <div className="flex items-center gap-2 sm:gap-4 relative">
               {/* Settings Dropdown Emulation */}
               {showSettings && (
                 <div className="absolute bottom-full right-0 mb-2 bg-[#1C1C1F] border border-white/10 rounded-xl p-3 shadow-2xl min-w-[160px] flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 z-50">
@@ -767,7 +809,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
       {/* Video metadata titles, Facebook Reactions and actions */}
       <div className="p-4 flex flex-col gap-3 bg-[#121214]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
+          <div className="flex-1">
             {video.category === "rental" && (
               <span className="bg-amber-600/90 text-amber-50 rounded-md font-bold px-2 py-0.5 text-[10px] tracking-wide mr-2 shadow inline-block">
                 📽️ Rental Exclusive: {video.rentalPrice}$ / {video.rentalPeriod}
@@ -783,14 +825,37 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
             </h1>
           </div>
           
-          {/* Diagnostic page repair refresh button */}
-          <button
-            onClick={triggerResetRefresh}
-            className="text-[10px] flex items-center gap-1.5 self-start text-purple-400 border border-purple-900/60 bg-purple-950/20 px-2 py-1 rounded-lg hover:bg-purple-950/50 cursor-pointer"
-            id="crash-refresh-button"
-          >
-            <RefreshCw className="w-3 h-3" /> Page/Player Crash Rescue
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Share button */}
+            <button
+              onClick={() => {
+                const shareData = {
+                  title: video.title,
+                  text: video.description,
+                  url: window.location.href
+                };
+                if (navigator.share) {
+                  navigator.share(shareData).catch(console.error);
+                } else {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert("Link copied to clipboard! 📋");
+                }
+              }}
+              className="flex items-center gap-1.5 text-[10px] sm:text-xs bg-white/5 hover:bg-white/10 text-white px-3 py-1.5 rounded-xl border border-white/10 transition cursor-pointer"
+              id="share-video-button"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
+            </button>
+
+            {/* Diagnostic page repair refresh button */}
+            <button
+              onClick={triggerResetRefresh}
+              className="text-[10px] flex items-center gap-1.5 self-start text-purple-400 border border-purple-900/60 bg-purple-950/20 px-2 py-1.5 rounded-xl hover:bg-purple-950/50 cursor-pointer"
+              id="crash-refresh-button"
+            >
+              <RefreshCw className="w-3 h-3" /> Fix Player
+            </button>
+          </div>
         </div>
 
         {/* Statistics & location timestamp */}
