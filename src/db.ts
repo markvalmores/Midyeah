@@ -444,6 +444,29 @@ export async function getUserCount(): Promise<number> {
   }
 }
 
+export async function checkProfileUniqueness(
+  field: "username" | "channelName" | "channelUrl",
+  value: string,
+  excludeEmail: string
+): Promise<boolean> {
+  const collRef = collection(db, "profiles");
+  const qItem = query(collRef, where(field, "==", value));
+  
+  try {
+    const snap = await getDocs(qItem);
+    let isUnique = true;
+    snap.forEach((docSnap) => {
+      if (docSnap.id !== excludeEmail) {
+        isUnique = false;
+      }
+    });
+    return isUnique;
+  } catch (err) {
+    console.warn(`Uniqueness check failed for ${field}:`, err);
+    return true; // fail-open for local-first sync
+  }
+}
+
 // Profile Sync functions
 export async function saveProfile(profile: UserProfile): Promise<void> {
   if (isGuestAccount(profile.email)) {
@@ -1671,10 +1694,9 @@ export async function saveLikeDislikeStatus(
     if (type === "dislike") videoUpdate.dislikes = increment(1);
 
     const batch = writeBatch(db);
-    // Use set with merge so it queues safely offline even if the global document is partial
-    // Wait, increment() in set with merge works beautifully
+    // Use .update() because dot notation like reactions.like only works in .update()
     if (Object.keys(videoUpdate).length > 0) {
-      batch.set(videoRef, videoUpdate, { merge: true });
+      batch.update(videoRef, videoUpdate);
     }
     
     if (type === null) {
@@ -1685,7 +1707,7 @@ export async function saveLikeDislikeStatus(
         videoId,
         type,
         timestamp: new Date().toISOString()
-      });
+      }, { merge: true });
     }
 
     await batch.commit();
@@ -1743,7 +1765,7 @@ export async function saveVideoReactionStatus(
 
     const batch = writeBatch(db);
     if (Object.keys(videoUpdate).length > 0) {
-      batch.set(videoRef, videoUpdate, { merge: true });
+      batch.update(videoRef, videoUpdate);
     }
 
     if (type === null) {
@@ -1754,7 +1776,7 @@ export async function saveVideoReactionStatus(
         videoId,
         type,
         timestamp: new Date().toISOString()
-      });
+      }, { merge: true });
     }
 
     await batch.commit();

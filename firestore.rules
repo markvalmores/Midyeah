@@ -26,9 +26,9 @@ service cloud.firestore {
           && data.email is string && data.email.size() <= 100
           && data.channelName is string && data.channelName.size() <= 100
           && data.channelUrl is string && data.channelUrl.size() <= 100
-          && (data.subscribersCount == null || data.subscribersCount is int)
-          && (data.rentalPaid == null || data.rentalPaid is bool)
-          && (data.rentalExpiry == null || data.rentalExpiry is string);
+          && (!('subscribersCount' in data) || data.subscribersCount == null || data.subscribersCount is int || data.subscribersCount is number)
+          && (!('rentalPaid' in data) || data.rentalPaid == null || data.rentalPaid is bool)
+          && (!('rentalExpiry' in data) || data.rentalExpiry == null || data.rentalExpiry is string);
     }
 
     function isValidVideo(data) {
@@ -36,12 +36,12 @@ service cloud.firestore {
           && data.title is string && data.title.size() <= 200
           && data.videoUrl is string && data.videoUrl.size() <= 2048
           && data.category in ['normal', 'movie', 'rental']
-          && data.duration is number
+          && (data.duration is number || data.duration is string)
           && data.creatorEmail is string
-          && (data.likes == null || data.likes is int)
-          && (data.dislikes == null || data.dislikes is int)
-          && (data.views == null || data.views is int)
-          && (data.reactions == null || data.reactions is map);
+          && (!('likes' in data) || data.likes == null || data.likes is int || data.likes is number)
+          && (!('dislikes' in data) || data.dislikes == null || data.dislikes is int || data.dislikes is number)
+          && (!('views' in data) || data.views == null || data.views is int || data.views is number)
+          && (!('reactions' in data) || data.reactions == null || data.reactions is map);
     }
 
     function isValidVideoChunk(data) {

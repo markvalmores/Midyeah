@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, Video } from "../types";
-import { subscribeToSubscribersCount, isGuestAccount } from "../db";
+import { subscribeToSubscribersCount, isGuestAccount, checkProfileUniqueness } from "../db";
 
 interface ProfileProps {
   profile: UserProfile;
@@ -31,6 +31,17 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
 
   const [isDragOverAvatar, setIsDragOverAvatar] = useState(false);
   const [isDragOverCover, setIsDragOverCover] = useState(false);
+
+  // Field validation states
+  const [nameError, setNameError] = useState("");
+  const [urlError, setUrlError] = useState("");
+  const [userError, setUserError] = useState("");
+  
+  const [nameSuccess, setNameSuccess] = useState("");
+  const [urlSuccess, setUrlSuccess] = useState("");
+  const [userSuccess, setUserSuccess] = useState("");
+
+  const [isSaving, setIsSaving] = useState(false);
 
   // GCash & PayPal Withdrawal Setup
   const [gcash, setGcash] = useState(profile.gcash || "");
@@ -140,12 +151,52 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
     reader.readAsDataURL(file);
   };
 
-  const handleProfileSave = (e?: React.FormEvent) => {
+  const handleProfileSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isGuestAccount(profile?.email)) {
       alert("Watching-only mode: Guest profiles cannot be modified.");
       return;
     }
+
+    if (!username.trim() || !channelName.trim() || !channelUrl.trim()) {
+      return; // Stop if empty
+    }
+
+    setIsSaving(true);
+    let hasError = false;
+
+    // Reset validations
+    setNameError(""); setUrlError(""); setUserError("");
+    setNameSuccess(""); setUrlSuccess(""); setUserSuccess("");
+
+    const isUserUnique = await checkProfileUniqueness("username", username, profile.email);
+    if (!isUserUnique) {
+      setUserError("sorry this name already existed teehee nyaaa~ <3");
+      hasError = true;
+    } else {
+      setUserSuccess("Praise God That Name is Available Yippee");
+    }
+
+    const isNameUnique = await checkProfileUniqueness("channelName", channelName, profile.email);
+    if (!isNameUnique) {
+      setNameError("sorry this name already existed teehee nyaaa~ <3");
+      hasError = true;
+    } else {
+      setNameSuccess("Praise God That Name is Available Yippee");
+    }
+
+    const isUrlUnique = await checkProfileUniqueness("channelUrl", channelUrl, profile.email);
+    if (!isUrlUnique) {
+      setUrlError("sorry this name already existed teehee nyaaa~ <3");
+      hasError = true;
+    } else {
+      setUrlSuccess("Praise God That Name is Available Yippee");
+    }
+
+    setIsSaving(false);
+
+    if (hasError) return; // Prevent updating until unique
+
     onUpdate({
       ...profile,
       username,
@@ -430,9 +481,11 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
                   value={channelUrl}
                   onChange={(e) => setChannelUrl(e.target.value)}
                   onBlur={handleBlur}
-                  className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-purple-400 font-mono font-bold outline-none focus:border-purple-500 transition"
+                  className={`w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-purple-400 font-mono font-bold outline-none focus:border-purple-500 transition ${urlError ? "border-red-500" : urlSuccess ? "border-green-500" : ""}`}
                   id="profile-ch-handle-input"
                 />
+                {urlError && <p className="text-red-500 text-[10px] mt-1 italic">{urlError}</p>}
+                {urlSuccess && !urlError && <p className="text-green-500 text-[10px] mt-1 font-bold">{urlSuccess}</p>}
               </div>
             </div>
 
@@ -446,9 +499,11 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   onBlur={handleBlur}
-                  className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition"
+                  className={`w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition ${userError ? "border-red-500" : userSuccess ? "border-green-500" : ""}`}
                   id="profile-username-input"
                 />
+                {userError && <p className="text-red-500 text-[10px] mt-1 italic">{userError}</p>}
+                {userSuccess && !userError && <p className="text-green-500 text-[10px] mt-1 font-bold">{userSuccess}</p>}
               </div>
 
               <div>
@@ -460,9 +515,11 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
                   onBlur={handleBlur}
-                  className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition"
+                  className={`w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-purple-500 transition ${nameError ? "border-red-500" : nameSuccess ? "border-green-500" : ""}`}
                   id="profile-ch-name-input"
                 />
+                {nameError && <p className="text-red-500 text-[10px] mt-1 italic">{nameError}</p>}
+                {nameSuccess && !nameError && <p className="text-green-500 text-[10px] mt-1 font-bold">{nameSuccess}</p>}
               </div>
             </div>
 
@@ -482,10 +539,11 @@ export default function Profile({ profile, userVideos, onUpdate, onLogOut, onDel
             <div className="pt-2 border-t border-purple-950/30 flex justify-end">
               <button
                 type="submit"
-                className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-5 py-2 rounded-xl cursor-pointer shadow transition"
+                disabled={isSaving}
+                className={`bg-purple-600 hover:bg-purple-500 text-white font-bold px-5 py-2 rounded-xl cursor-pointer shadow transition ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                 id="save-profile-btn"
               >
-                Save Cozy Settings
+                {isSaving ? "Saving..." : "Save Cozy Settings"}
               </button>
             </div>
           </form>
