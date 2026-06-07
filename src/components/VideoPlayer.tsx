@@ -112,12 +112,14 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     saveVideo(updatedVideo).catch(err => console.warn("Failed to sync views:", err));
 
     // Fetch saved resume time
-    getPlayOffset(video.id).then((savedTime) => {
-      if (savedTime > 0 && videoRef.current) {
-        videoRef.current.currentTime = savedTime;
-        setCurrentTime(savedTime);
-      }
-    });
+    if (video.source !== "youtube") {
+      getPlayOffset(video.id).then((savedTime) => {
+        if (savedTime > 0 && videoRef.current) {
+          videoRef.current.currentTime = savedTime;
+          setCurrentTime(savedTime);
+        }
+      });
+    }
 
     // Generate AI Subtitles dynamically based on video details
     const words = [
@@ -153,7 +155,7 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
 
   // Autoplay trigger
   useEffect(() => {
-    if (isAutoplay && videoRef.current && !crashState) {
+    if (video.source !== "youtube" && isAutoplay && videoRef.current && !crashState) {
       videoRef.current.play().then(() => {
         setIsPlaying(true);
       }).catch(() => {
@@ -526,6 +528,17 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
               <RefreshCw className="w-4 h-4" /> Refresh Renderer
             </button>
           </div>
+        ) : video.source === "youtube" ? (
+          /* YouTube Embed Player */
+          <iframe
+            src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
+            title={video.title}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="w-full h-full z-10"
+            onLoad={() => setIsPlaying(true)}
+          />
         ) : video.is360 ? (
           /* 360 VR Canvas Sphere Projector */
           <canvas
@@ -580,9 +593,10 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
         )}
 
         {/* Controls Overlay Panel */}
-        <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 sm:p-4 transition-all duration-300 flex flex-col gap-2 z-30 select-none ${controlsVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 pointer-events-none"}`}>
-          {/* Progress Slider */}
-          <div className="flex items-center gap-2 group/seek">
+        {video.source !== "youtube" && (
+          <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 sm:p-4 transition-all duration-300 flex flex-col gap-2 z-30 select-none ${controlsVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 pointer-events-none"}`}>
+            {/* Progress Slider */}
+            <div className="flex items-center gap-2 group/seek">
             <span className="text-[10px] text-gray-300 font-mono w-10 text-right">
               {formatTime(currentTime)}
             </span>
@@ -802,8 +816,9 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
             </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Video metadata titles, Facebook Reactions and actions */}

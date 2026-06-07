@@ -540,7 +540,9 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
       reactions: video.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
       duration: video.duration || 120,
       thumbnailUrl: video.thumbnailUrl || "",
-      hasVideoData: !!videoBlob || !!video.blob
+      hasVideoData: !!videoBlob || !!video.blob,
+      source: video.source || "local",
+      youtubeId: video.youtubeId || ""
     };
 
     if (hasFirestoreQuota) {
@@ -608,7 +610,9 @@ export function subscribeAllVideos(callback: (videos: Video[]) => void): () => v
         reactions: dv.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
         duration: dv.duration || 120,
         thumbnailUrl: dv.thumbnailUrl || "",
-        country: dv.country || "philippines"
+        country: dv.country || "philippines",
+        source: dv.source || "local",
+        youtubeId: dv.youtubeId || ""
       });
     });
 
@@ -700,7 +704,9 @@ export async function getAllVideos(): Promise<Video[]> {
         dislikes: dv.dislikes || 0,
         reactions: dv.reactions || { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
         duration: dv.duration || 120,
-        thumbnailUrl: dv.thumbnailUrl || ""
+        thumbnailUrl: dv.thumbnailUrl || "",
+        source: dv.source || "local",
+        youtubeId: dv.youtubeId || ""
       });
     });
   } catch (err) {

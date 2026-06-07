@@ -1,6 +1,6 @@
 {
   "name": "MidYeah",
-  "description": "MidYeah - Your online streaming platform that makes you joyful and comfortable when you watch. Created by Mark David Valmores via AI Studio.",
+  "description": "MidYeah - Your online streaming platform featuring local uploads and YouTube link support. Enjoy cinematic movies and social watch rooms. Created by Mark David Valmores.",
   "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

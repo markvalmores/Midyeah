@@ -51,6 +51,8 @@ export interface Video {
   isOffline?: boolean; // is cached offline
   thumbnailUrl?: string; // custom or auto-captured screenshot jpeg base64
   country?: string; // Country location tag: "philippines", "japan", "usa", "uk", etc.
+  source?: "local" | "youtube"; // "local" for file uploads, "youtube" for links
+  youtubeId?: string; // The extracted YouTube video ID
 }
 
 export interface Comment {

@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles,
+  Video as VideoIcon, Tv, Radio, Gamepad, User, LogIn, Plus, Sparkles, Youtube, ExternalLink,
   ShieldAlert, Settings, Coffee, Wifi, WifiOff, Upload, ArrowLeftRight, HelpCircle, Dumbbell,
   Trash2, Check, X, FolderHeart, FolderPlus, Gift, Search, Info
 } from "lucide-react";
@@ -234,6 +234,8 @@ export default function App() {
   const [uploadRentalPeriod, setUploadRentalPeriod] = useState("month");
   const [uploadCountry, setUploadCountry] = useState("philippines");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadSource, setUploadSource] = useState<"local" | "youtube">("local");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadStage, setUploadStage] = useState<string>("");
 
@@ -608,11 +610,27 @@ export default function App() {
   };
 
   // New Video upload registration
+  const extractYouTubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
   const handleVideoUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadFile) {
+    
+    if (uploadSource === "local" && !uploadFile) {
       alert("Please upload a supported video file.");
       return;
+    }
+
+    let ytId = null;
+    if (uploadSource === "youtube") {
+      ytId = extractYouTubeId(youtubeUrl);
+      if (!ytId) {
+        alert("Invalid YouTube URL. Please provide a valid link.");
+        return;
+      }
     }
 
     if (uploadCategory === "rental") {
@@ -638,7 +656,10 @@ export default function App() {
       setUploadStage("Processing...");
 
       // Prepare movie credentials
-      const videoUrl = URL.createObjectURL(uploadFile);
+      const videoUrl = uploadSource === "youtube" 
+        ? `https://www.youtube.com/embed/${ytId}` 
+        : URL.createObjectURL(uploadFile as File);
+        
       const mockId = "vid_" + Date.now();
 
       const newVideo: Video = {
@@ -656,15 +677,19 @@ export default function App() {
         likes: 0,
         dislikes: 0,
         reactions: { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
-        duration: 120, // simulate duration value
-        blob: uploadFile, // save actual file to IndexedDB!
-        thumbnailUrl: thumbnailPreviewUrl || "",
-        country: uploadCountry
+        duration: uploadSource === "youtube" ? 0 : 120, // Duration unknown for YT links initially
+        blob: uploadSource === "local" ? (uploadFile || undefined) : undefined,
+        thumbnailUrl: uploadSource === "youtube" 
+          ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`
+          : (thumbnailPreviewUrl || ""),
+        country: uploadCountry,
+        source: uploadSource,
+        youtubeId: ytId || undefined
       };
 
       // Stage 3: Initializing sync
       setUploadProgress(45);
-      setUploadStage("Readying upload...");
+      setUploadStage(uploadSource === "youtube" ? "Linking to dashboard..." : "Readying upload...");
 
       // WATCHDOG: If stuck at any percentage for more than 40 seconds, force completion
       const uploadTimeout = setTimeout(() => {
@@ -684,40 +709,50 @@ export default function App() {
 
       try {
         // Run saveVideo and await completion
-        await saveVideo(newVideo, uploadFile, (p) => {
-          // Map 0-100 to 45-100 range for smoother UI transitions
-          const mappedProgress = Math.floor(45 + (p * 0.55));
-          setUploadProgress(mappedProgress);
-          setUploadStage(p === 100 ? "Finalizing..." : `Syncing... ${p}%`);
-        });
+        // For YouTube links, we don't upload chunks, we just save metadata
+        if (uploadSource === "youtube") {
+          setUploadProgress(80);
+          setUploadStage("Linking YouTube Content...");
+          await saveVideo(newVideo); // metadata only
+          setUploadProgress(100);
+        } else if (uploadFile) {
+          await saveVideo(newVideo, uploadFile, (p) => {
+            // Map 0-100 to 45-100 range for smoother UI transitions
+            const mappedProgress = Math.floor(45 + (p * 0.55));
+            setUploadProgress(mappedProgress);
+            setUploadStage(p === 100 ? "Finalizing..." : `Syncing... ${p}%`);
+          });
+        }
         
         clearTimeout(uploadTimeout);
         
         // Update the videos list only AFTER successful save
         setVideosList(prev => [newVideo, ...prev]);
-      reloadVideos(); // Extra sync to ensure list is perfect
-      
-      setUploadProgress(100);
-      setUploadStage("Completed!");
-      
-      // Show success notification bubble
-      showNotification("✨ Your post has been successful. God Bless.");
-      
-      // Delay reset so user sees 100% completion
-      setTimeout(() => {
-        setUploadTitle("");
-        setUploadDesc("");
-        setUploadIs360(false);
-        setUploadCategory("normal");
-        setUploadCountry("philippines");
-        setUploadFile(null);
-        setUploadThumbnailMode("auto");
-        setCustomThumbnailFile(null);
-        setThumbnailPreviewUrl("");
-        setUploadProgress(null);
-        setUploadStage("");
-        setIsCreatorMode(false); // switch back to explore view
-      }, 1500);
+        reloadVideos(); // Extra sync to ensure list is perfect
+        
+        setUploadProgress(100);
+        setUploadStage("Completed!");
+        
+        // Show success notification bubble
+        showNotification("✨ Your post has been successful. God Bless.");
+        
+        // Delay reset so user sees 100% completion
+        setTimeout(() => {
+          setUploadTitle("");
+          setUploadDesc("");
+          setUploadIs360(false);
+          setUploadCategory("normal");
+          setUploadCountry("philippines");
+          setUploadFile(null);
+          setYoutubeUrl("");
+          setUploadSource("local");
+          setUploadThumbnailMode("auto");
+          setCustomThumbnailFile(null);
+          setThumbnailPreviewUrl("");
+          setUploadProgress(null);
+          setUploadStage("");
+          setIsCreatorMode(false); // switch back to explore view
+        }, 1500);
     } catch (err: any) {
       console.error("Upload process failure:", err);
       // Even if cloud sync failed, it's saved locally now because of our db.ts fix.
@@ -1213,6 +1248,32 @@ export default function App() {
                     </div>
 
                     <form onSubmit={handleVideoUploadSubmit} className="space-y-4 text-xs">
+                      {/* Source Selection Toggle */}
+                      <div className="flex bg-black/40 rounded-2xl p-1 border border-white/5 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setUploadSource("local")}
+                          className={`flex-1 py-3 text-[10px] font-black rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            uploadSource === "local"
+                              ? "bg-purple-600 shadow-lg text-white"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <Upload className="w-4 h-4" /> LOCAL FILE UPLOAD
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUploadSource("youtube")}
+                          className={`flex-1 py-3 text-[10px] font-black rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            uploadSource === "youtube"
+                              ? "bg-rose-600 shadow-lg text-white"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <Sparkles className="w-4 h-4" /> YOUTUBE LINK POST
+                        </button>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-slate-300 font-semibold mb-1 uppercase text-[10px]">Showcase Video Title</label>
@@ -1228,15 +1289,37 @@ export default function App() {
                         </div>
 
                         <div>
-                          <label className="block text-[#ccaaff] font-semibold mb-1 uppercase text-[10px]">SELECT FILE (MP4, WEBM, AVI, FLV, SWF)</label>
-                          <input
-                            type="file"
-                            required
-                            accept="video/*"
-                            onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
-                            className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 cursor-pointer text-purple-300 font-semibold focus:border-purple-500 transition"
-                            id="upload-vid-file"
-                          />
+                          {uploadSource === "local" ? (
+                            <>
+                              <label className="block text-[#ccaaff] font-semibold mb-1 uppercase text-[10px]">SELECT FILE (MP4, WEBM, AVI, FLV, SWF)</label>
+                              <input
+                                type="file"
+                                required
+                                accept="video/*"
+                                onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                                className="w-full bg-[#1C1C1F] border border-white/10 rounded-xl p-3 cursor-pointer text-purple-300 font-semibold focus:border-purple-500 transition"
+                                id="upload-vid-file"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <label className="block text-rose-300 font-semibold mb-1 uppercase text-[10px]">YouTube Video Link</label>
+                              <div className="relative">
+                                <input
+                                  type="url"
+                                  required
+                                  placeholder="https://www.youtube.com/watch?v=..."
+                                  value={youtubeUrl}
+                                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                                  className="w-full bg-[#1C1C1F] border border-rose-900/40 rounded-xl p-3 text-white outline-none focus:border-rose-500 font-semibold transition pr-10"
+                                  id="upload-yt-url"
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                  <Sparkles className="w-4 h-4 text-rose-500 animate-pulse" />
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -1754,9 +1837,17 @@ export default function App() {
                               {/* Title description details */}
                               <div className="p-3">
                                 <h3 className="font-bold text-xs text-gray-100 line-clamp-1 group-hover:text-purple-300 transition shrink-0 flex items-center gap-1.5">
-                                  {vid.category === 'movie' && <span className="bg-red-500/20 text-red-500 p-1 rounded-md border border-red-500/30 shrink-0" title="Movie"><Tv className="w-3 h-3" /></span>}
-                                  {vid.category === 'rental' && <span className="bg-purple-500/20 text-purple-400 p-1 rounded-md border border-purple-500/30 shrink-0" title="Rental"><Tv className="w-3 h-3" /></span>}
-                                  {(!vid.category || vid.category === 'standard' || vid.category === 'normal') && <span className="bg-green-500/20 text-green-500 p-1 rounded-md border border-green-500/30 shrink-0" title="Standard Video"><VideoIcon className="w-3 h-3" /></span>}
+                                  {vid.source === 'youtube' ? (
+                                    <span className="bg-rose-500/20 text-rose-500 p-1 rounded-md border border-rose-500/30 shrink-0" title="YouTube Link">
+                                      <Youtube className="w-3 h-3" />
+                                    </span>
+                                  ) : (
+                                    <>
+                                      {vid.category === 'movie' && <span className="bg-red-500/20 text-red-500 p-1 rounded-md border border-red-500/30 shrink-0" title="Movie"><Tv className="w-3 h-3" /></span>}
+                                      {vid.category === 'rental' && <span className="bg-purple-500/20 text-purple-400 p-1 rounded-md border border-purple-500/30 shrink-0" title="Rental"><Tv className="w-3 h-3" /></span>}
+                                      {(!vid.category || vid.category === 'standard' || vid.category === 'normal') && <span className="bg-green-500/20 text-green-500 p-1 rounded-md border border-green-500/30 shrink-0" title="Standard Video"><VideoIcon className="w-3 h-3" /></span>}
+                                    </>
+                                  )}
                                   <span className="truncate">{vid.title}</span>
                                 </h3>
                                 <p className="text-[10px] text-purple-400 font-semibold uppercase mt-0.5">
