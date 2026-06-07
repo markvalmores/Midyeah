@@ -3,7 +3,7 @@ import { Gamepad2 } from 'lucide-react';
 
 export default function GamesCorner() {
   const games = [
-    { title: "Y8 Games", url: "https://www.y8.com/" }
+    { title: "HTML5 Games", url: "https://html5games.com/" }
   ];
   const [selectedGame, setSelectedGame] = useState(games[0]);
 
@@ -26,9 +26,10 @@ export default function GamesCorner() {
       </div>
       <iframe
         src={selectedGame.url}
-        className="w-full flex-grow rounded-2xl border border-white/10"
+        className="rounded-2xl border border-white/10"
         title={selectedGame.title}
         allow="autoplay; fullscreen"
+        style={{ width: '2622px', height: '1206px' }}
       />
     </div>
   );
