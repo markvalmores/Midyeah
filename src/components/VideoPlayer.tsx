@@ -413,7 +413,8 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     
     // Optimistic UI update
     let freshReacts = { ...reactCounts };
-    const userIdentifier = currUser?.email || (() => {
+    const savedEmail = localStorage.getItem("midyeah_active_session_email");
+    const userIdentifier = currUser?.email || savedEmail || (() => {
       let localAnon = localStorage.getItem("midyeah_anon_user_id");
       if (!localAnon) {
         localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);
@@ -454,7 +455,8 @@ export default function VideoPlayer({ video, currUser, onDownload, onSaveToLibra
     let newLikes = video.likes || 0;
     let newDislikes = video.dislikes || 0;
     let nextRated: "like" | "dislike" | null = null;
-    const userIdentifier = currUser?.email || (() => {
+    const savedEmail = localStorage.getItem("midyeah_active_session_email");
+    const userIdentifier = currUser?.email || savedEmail || (() => {
       let localAnon = localStorage.getItem("midyeah_anon_user_id");
       if (!localAnon) {
         localAnon = "client_anon_" + Math.random().toString(36).substring(2, 11);

@@ -1658,33 +1658,37 @@ export async function saveLikeDislikeStatus(
   const videoRef = doc(db, "global_videos", videoId);
 
   try {
-    await runTransaction(db, async (transaction) => {
-      const likeSnap = await transaction.get(likeRef);
-      const oldType = likeSnap.exists() ? likeSnap.data().type : null;
+    const likeSnap = await getDoc(likeRef);
+    const oldType = likeSnap.exists() ? likeSnap.data().type : null;
 
-      if (oldType === type) return; // No change
+    if (oldType === type) return; // No change
 
-      const videoUpdate: any = {};
-      if (oldType === "like") videoUpdate.likes = increment(-1);
-      if (oldType === "dislike") videoUpdate.dislikes = increment(-1);
-      
-      if (type === "like") videoUpdate.likes = increment(1);
-      if (type === "dislike") videoUpdate.dislikes = increment(1);
+    const videoUpdate: any = {};
+    if (oldType === "like") videoUpdate.likes = increment(-1);
+    if (oldType === "dislike") videoUpdate.dislikes = increment(-1);
+    
+    if (type === "like") videoUpdate.likes = increment(1);
+    if (type === "dislike") videoUpdate.dislikes = increment(1);
 
-      // Perform updates
-      transaction.update(videoRef, videoUpdate);
-      
-      if (type === null) {
-        transaction.delete(likeRef);
-      } else {
-        transaction.set(likeRef, {
-          userId,
-          videoId,
-          type,
-          timestamp: new Date().toISOString()
-        });
-      }
-    });
+    const batch = writeBatch(db);
+    // Use set with merge so it queues safely offline even if the global document is partial
+    // Wait, increment() in set with merge works beautifully
+    if (Object.keys(videoUpdate).length > 0) {
+      batch.set(videoRef, videoUpdate, { merge: true });
+    }
+    
+    if (type === null) {
+      batch.delete(likeRef);
+    } else {
+      batch.set(likeRef, {
+        userId,
+        videoId,
+        type,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    await batch.commit();
   } catch (error) {
     handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, `likes_dislikes/${likeId}`);
   }
@@ -1724,33 +1728,36 @@ export async function saveVideoReactionStatus(
   const videoRef = doc(db, "global_videos", videoId);
 
   try {
-    await runTransaction(db, async (transaction) => {
-      const reactSnap = await transaction.get(reactRef);
-      const oldType = reactSnap.exists() ? reactSnap.data().type : null;
+    const reactSnap = await getDoc(reactRef);
+    const oldType = reactSnap.exists() ? reactSnap.data().type : null;
 
-      if (oldType === type) return;
+    if (oldType === type) return;
 
-      const videoUpdate: any = {};
-      if (oldType) {
-        videoUpdate[`reactions.${oldType}`] = increment(-1);
-      }
-      if (type) {
-        videoUpdate[`reactions.${type}`] = increment(1);
-      }
+    const videoUpdate: any = {};
+    if (oldType) {
+      videoUpdate[`reactions.${oldType}`] = increment(-1);
+    }
+    if (type) {
+      videoUpdate[`reactions.${type}`] = increment(1);
+    }
 
-      transaction.update(videoRef, videoUpdate);
+    const batch = writeBatch(db);
+    if (Object.keys(videoUpdate).length > 0) {
+      batch.set(videoRef, videoUpdate, { merge: true });
+    }
 
-      if (type === null) {
-        transaction.delete(reactRef);
-      } else {
-        transaction.set(reactRef, {
-          userId,
-          videoId,
-          type,
-          timestamp: new Date().toISOString()
-        });
-      }
-    });
+    if (type === null) {
+      batch.delete(reactRef);
+    } else {
+      batch.set(reactRef, {
+        userId,
+        videoId,
+        type,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    await batch.commit();
   } catch (error) {
     handleFirestoreError(error, type === null ? OperationType.DELETE : OperationType.WRITE, `video_reactions/${reactId}`);
   }
