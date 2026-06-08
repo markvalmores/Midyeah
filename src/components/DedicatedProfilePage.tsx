@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   ArrowLeft, CheckCircle, Share2, Globe, Heart, Play, 
-  Tv, Sparkles, Flame, UserCheck, Calendar, ShieldCheck 
+  Tv, Sparkles, Flame, UserCheck, Calendar, ShieldCheck,
+  UserPlus, MessageSquare
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, Video } from "../types";
@@ -14,8 +15,10 @@ import Profile from "./Profile";
 import { 
   toggleSubscription, 
   checkSubscriptionStatus, 
-  subscribeToSubscribersCount 
+  subscribeToSubscribersCount,
+  db
 } from "../db";
+import { doc, setDoc } from "firebase/firestore";
 
 interface DedicatedProfilePageProps {
   ownerProfile: UserProfile;
@@ -77,6 +80,31 @@ export default function DedicatedProfilePage({
       setHasSubscribed(isSubbedNow);
     } catch (err) {
       console.error("Failed to toggle subscription in database:", err);
+    }
+  };
+
+  const handleAddFriend = async () => {
+    if (!currentUser) {
+      alert("Please log in to add friends.");
+      return;
+    }
+    if (currentUser.email.startsWith("guest_")) {
+      alert("Guest accounts cannot add friends.");
+      return;
+    }
+    try {
+      const friendshipId = [currentUser.email, ownerProfile.email].sort().join("_connection_");
+      const ref = doc(db, "friendships", friendshipId);
+      await setDoc(ref, {
+        id: friendshipId,
+        members: [currentUser.email, ownerProfile.email],
+        status: "friends",
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+      alert(`You are now connected with ${ownerProfile.channelName || ownerProfile.username}! Open Messenger to chat.`);
+    } catch (err) {
+      console.error("Error adding friend:", err);
+      alert("Could not connect right now.");
     }
   };
 
@@ -208,23 +236,40 @@ export default function DedicatedProfilePage({
               </div>
 
               {/* Action Buttons (Subscribe, Support) */}
-              <div className="flex items-center gap-3">
-                {!isOwnProfile ? (
+              <div className="flex items-center gap-2 flex-wrap mt-4 sm:max-w-md w-full">
+                {!isOwnProfile && currentUser ? (
+                  <>
+                    <button
+                      onClick={handleToggleSubscribe}
+                      className={`flex-1 min-w-[120px] p-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition duration-150 cursor-pointer flex justify-center items-center gap-2 ${
+                        hasSubscribed 
+                          ? "bg-slate-800 border border-white/10 text-slate-400" 
+                          : "bg-purple-600 hover:bg-purple-500 text-white shadow-xl shadow-purple-500/20"
+                      }`}
+                    >
+                      {hasSubscribed ? <UserCheck className="w-4 h-4 text-emerald-400" /> : <Flame className="w-4 h-4 text-amber-300 animate-pulse" />}
+                      <span>{hasSubscribed ? "Subscribed" : "Subscribe"}</span>
+                    </button>
+                    
+                    <button
+                      onClick={handleAddFriend}
+                      className="flex-1 min-w-[120px] p-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition duration-150 cursor-pointer flex justify-center items-center gap-2 bg-[#2D2D35] hover:bg-[#3D3D45] text-white border border-white/10 shadow-lg"
+                    >
+                      <UserPlus className="w-4 h-4 text-cyan-400" />
+                      <span>Connect</span>
+                    </button>
+                  </>
+                ) : !isOwnProfile && !currentUser ? (
                   <button
-                    onClick={handleToggleSubscribe}
-                    className={`p-3 px-5 rounded-2xl font-black text-xs uppercase tracking-wider transition duration-150 cursor-pointer flex items-center gap-2 ${
-                      hasSubscribed 
-                        ? "bg-slate-800 border border-white/10 text-slate-400" 
-                        : "bg-purple-600 hover:bg-purple-500 text-white shadow-xl shadow-purple-500/20"
-                    }`}
+                    onClick={() => alert("Please log in to participate in the community! 🌸")}
+                    className="flex-1 p-2.5 rounded-xl font-black text-xs uppercase bg-[#2D2D35] text-gray-400 border border-white/10 cursor-pointer hover:bg-[#3D3D45]"
                   >
-                    {hasSubscribed ? <UserCheck className="w-4 h-4 text-emerald-400" /> : <Flame className="w-4 h-4 text-amber-300 animate-pulse" />}
-                    <span>{hasSubscribed ? "Subscribed" : "Subscribe"}</span>
+                    Log In to Follow
                   </button>
                 ) : (
                   <button
                     onClick={() => setShowEditMode(true)}
-                    className="p-3 px-5 rounded-2xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/30 text-purple-300 font-bold text-xs uppercase cursor-pointer"
+                    className="w-full sm:w-auto p-3 px-6 rounded-2xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/30 text-purple-300 font-bold text-xs uppercase cursor-pointer transition"
                   >
                     Edit Channel Display
                   </button>

@@ -1334,7 +1334,7 @@ export default function App() {
       >
         <AnimatePresence mode="wait">
           {/* START SCREEN */}
-          {stepAuth === "startScreen" && (
+          {stepAuth === "startScreen" && !dedicatedProfileUser && (
             <motion.div
               key="start-screen"
               initial={{ opacity: 0 }}
@@ -1374,7 +1374,7 @@ export default function App() {
           )}
 
           {/* USER NOT REGISTERED -> AUTH BOARD */}
-          {stepAuth === "loggedOut" && (
+          {stepAuth === "loggedOut" && !dedicatedProfileUser && (
             <motion.div
               key="auth-email-pass"
               initial={{ opacity: 0, y: 15 }}
@@ -1421,7 +1421,7 @@ export default function App() {
           )}
 
           {/* AUTH CODE VERIFICATION FIELD */}
-          {stepAuth === "inputCode" && (
+          {stepAuth === "inputCode" && !dedicatedProfileUser && (
             <motion.div
               key="auth-enter-code"
               initial={{ opacity: 0, scale: 0.96 }}
