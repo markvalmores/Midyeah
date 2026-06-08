@@ -169,7 +169,6 @@ export default function App() {
           const profile = await getProfileByUsername(username);
           if (profile) {
             setDedicatedProfileUser(profile);
-            setStepAuth("loggedIn"); // Automatically enter to view profile
             return;
           }
         }
@@ -177,7 +176,6 @@ export default function App() {
         const profile = await getProfileByUsername(profileQuery);
         if (profile) {
           setDedicatedProfileUser(profile);
-          setStepAuth("loggedIn");
           return;
         }
       }
@@ -1475,7 +1473,7 @@ export default function App() {
           )}
 
           {/* ACTIVE LOGGED-IN SYSTEM VIEWBOARDS */}
-          {stepAuth === "loggedIn" && (
+          {(stepAuth === "loggedIn" || dedicatedProfileUser) && (
             <motion.div
               key="main-boards"
               initial={{ opacity: 0 }}
