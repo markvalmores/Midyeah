@@ -950,15 +950,18 @@ export default function App() {
         }, 1500);
     } catch (err: any) {
       console.error("Upload process failure:", err);
-      // Even if cloud sync failed, it's saved locally now because of our db.ts fix.
+      // Even if cloud sync failed, it's saved locally now.
       setUploadProgress(100);
-      setUploadStage("Completed locally!");
+      setUploadStage("Failed to sync to cloud!");
       reloadVideos();
+      
+      // Clearly notify user of failure
+      showNotification(`Upload failed to sync: ${err.message || 'Unknown network error'}`);
       
       setTimeout(() => {
         setUploadProgress(null);
         setIsCreatorMode(false);
-      }, 2000);
+      }, 5000); // Give user more time to read the toast
     }
     } catch (outerErr) {
       console.error("Critical upload block error:", outerErr);
