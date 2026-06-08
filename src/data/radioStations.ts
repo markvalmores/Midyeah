@@ -28,7 +28,7 @@ export const RADIO_STATIONS: RadioStation[] = [
   { id: "ph_davao_mor", name: "MOR 101.1 Davao", genre: "Davao Hits", streamUrl: "https://stream.zeno.fm/3fscq7nt3veuv", logo: "🍈", country: "philippines" },
   { id: "ph_spirit", name: "Spirit FM 99.1", genre: "Catholic Radio", streamUrl: "https://stream.zeno.fm/8qscq7nt3veuu", logo: "🕊️", country: "philippines" },
   { id: "ph_dzbb", name: "Super Radyo DZBB", genre: "News & Talk", streamUrl: "https://stream.zeno.fm/dw2e24shs8uv", logo: "🏙️", country: "philippines" },
-  { id: "ph_dzmm", name: "DZMM TeleRadyo", genre: "News", streamUrl: "https://stream.zeno.fm/6fscq7nt3veuv", logo: "📺", country: "philippines" },
+  { id: "ph_dzmm", name: "DZMM Teleradyo", genre: "News", streamUrl: "https://www.youtube.com/@DZMMTeleRadyo_MSPC", logo: "📺", country: "philippines", isYoutube: true, youtubeChannelId: "UCv-mO10hZ0_RMT5_206B_07Yw" },
   { id: "ph_brgy_cebu", name: "Barangay RT Cebu", genre: "Visayan Pop", streamUrl: "https://stream.zeno.fm/2fscq7nt3veuv", logo: "🕺", country: "philippines" },
   { id: "ph_monster_cebu", name: "Monster Radio BT 105.9", genre: "Pop", streamUrl: "https://stream.zeno.fm/u8vkq7nt3veuv", logo: "👾", country: "philippines" },
   { id: "ph_energy_cebu", name: "Energy FM Cebu", genre: "Pop", streamUrl: "https://stream.zeno.fm/a7fscq7nt3veuv", logo: "⚡", country: "philippines" },
@@ -42,13 +42,16 @@ export const RADIO_STATIONS: RadioStation[] = [
   { id: "ph_qfm", name: "QFM 101.3", genre: "Pop", streamUrl: "https://stream.zeno.fm/p8vkq7nt3veuv", logo: "🍡", country: "philippines" },
   { id: "ph_coolfm", name: "Cool FM 90.1", genre: "Easy", streamUrl: "https://stream.zeno.fm/w8vkq7nt3veuu", logo: "🍃", country: "philippines" },
 
-  // === JAPAN 🇯🇵 === (25 stations)
+  // === JAPAN 🇯🇵 === (30 stations)
   { id: "jp_moe", name: "LISTEN.moe J-Pop", genre: "J-Pop & Anime", streamUrl: "https://listen.moe/stream", logo: "🌸", country: "japan" },
   { id: "jp_vocaloid", name: "LISTEN.moe Vocaloid", genre: "Vocaloid", streamUrl: "https://listen.moe/vocaloid/stream", logo: "🤖", country: "japan" },
+  { id: "jp_vocal_radio", name: "Vocaloid Radio JP", genre: "Synthesizer", streamUrl: "http://stream.vocaloidradio.com:8000/stream", logo: "👩‍🎤", country: "japan" },
+  { id: "jp_miku_fm", name: "Miku FM Streaming", genre: "Vocaloid", streamUrl: "http://198.50.239.215:8482/stream", logo: "🎹", country: "japan" },
+  { id: "jp_voca_nx", name: "Vocal Nexus", genre: "Vocaloid", streamUrl: "http://radio.vocalnexus.com:8000/stream", logo: "🎧", country: "japan" },
+  { id: "jp_vocaloid_us", name: "Vocaloid Radio USA", genre: "Synthesizer", streamUrl: "https://curiosity.shoutca.st:8019/stream", logo: "🎤", country: "japan" },
   { id: "jp_retropc", name: "Retro PC Tokyo", genre: "8 tracks", streamUrl: "https://ice1.somafm.com/retropc-128-mp3", logo: "🎮", country: "japan" },
   { id: "jp_anime_ama", name: "Anime Amaze", genre: "Anime Music", streamUrl: "https://shoutcast.animeamaze.org:8000/;", logo: "✨", country: "japan" },
   { id: "jp_jpop_power", name: "J-Pop Powerplay", genre: "Modern J-Pop", streamUrl: "http://kathy.torontocast.com:8062/live", logo: "🔋", country: "japan" },
-  { id: "jp_vocal_radio", name: "Vocaloid Radio JP", genre: "Synthesizer", streamUrl: "http://stream.vocaloidradio.com:8000/stream", logo: "👩‍🎤", country: "japan" },
   { id: "jp_tokyo_fm", name: "Tokyo FM 80.0", genre: "Talk & Pop", streamUrl: "https://stream.zeno.fm/4vvkq7nt3veuv", logo: "🗼", country: "japan" },
   { id: "jp_nhk_r1", name: "NHK Radio 1 Tokyo", genre: "News", streamUrl: "https://stream.zeno.fm/6vvkq7nt3veuv", logo: "🎌", country: "japan" },
   { id: "jp_nhk_fm", name: "NHK FM Tokyo", genre: "Classical", streamUrl: "https://stream.zeno.fm/8vvkq7nt3veuv", logo: "🎼", country: "japan" },

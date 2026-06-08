@@ -105,6 +105,8 @@ export interface RadioStation {
   logo: string;
   country: string; // Country filter tag, e.g. "philippines", "japan", "usa", "uk", "france", "germany", "australia"
   youtubeChannelId?: string; // Optional YouTube channel ID or Live stream URL/embed tag
+  isYoutube?: boolean;
+  youtubeId?: string;
 }
 
 export interface Playlist {

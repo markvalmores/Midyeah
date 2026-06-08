@@ -36,6 +36,7 @@ export default function RadioPlayer() {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [useFallback, setUseFallback] = useState(false);
   const [fallbackEngagedStations, setFallbackEngagedStations] = useState<Record<string, boolean>>({});
+  const [hiddenStationIds, setHiddenStationIds] = useState<Record<string, boolean>>({});
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,6 +49,13 @@ export default function RadioPlayer() {
     audio.volume = volume;
 
     if (isPlaying) {
+      if (activeStation.isYoutube) {
+        setIsBuffering(false);
+        setStreamError(null);
+        audio.pause();
+        return;
+      }
+      
       setStreamError(null);
       setIsBuffering(true);
 
@@ -156,6 +164,18 @@ export default function RadioPlayer() {
       );
       setIsPlaying(false);
       setIsBuffering(false);
+      // Auto-hide the station if it doesn't work
+      setHiddenStationIds(prev => {
+        const nextHidden = { ...prev, [activeStation.id]: true };
+        const availableInCountry = stations.filter(st => {
+           if (nextHidden[st.id]) return false;
+           return selectedCountry === "all" || st.country === selectedCountry;
+        });
+        if (availableInCountry.length > 0) {
+           setActiveStation(availableInCountry[0]);
+        }
+        return nextHidden;
+      });
     }
   };
 
@@ -248,6 +268,7 @@ export default function RadioPlayer() {
 
   // Filter conditions
   const filteredStations = stations.filter(st => {
+    if (hiddenStationIds[st.id]) return false;
     const matchesCountry = selectedCountry === "all" || st.country === selectedCountry;
     const matchesSearch = searchQuery.trim() === "" || 
       st.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -266,6 +287,46 @@ export default function RadioPlayer() {
   };
 
   const isCurrentUsingFallbackStream = fallbackEngagedStations[activeStation.id] || useFallback;
+
+  const renderVisualizerOrYoutube = () => {
+    if (activeStation.isYoutube) {
+      const channelId = activeStation.youtubeChannelId || activeStation.youtubeId || "";
+      const embedUrl = `https://www.youtube.com/embed/live_stream?channel=${channelId}`;
+      
+      return (
+        <div className="w-full h-48 sm:h-64 bg-black relative" id="youtube-radio-container">
+          {isPlaying ? (
+            <iframe
+              width="100%"
+              height="100%"
+              src={`${embedUrl}&autoplay=1&mute=0`}
+              title="YouTube Radio Live"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="absolute inset-0"
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm space-y-3 cursor-pointer" onClick={() => setIsPlaying(true)}>
+               <div className="h-16 w-16 bg-purple-600/20 rounded-full flex items-center justify-center border border-purple-500/30">
+                  <Play className="w-8 h-8 text-purple-400 fill-purple-400" />
+               </div>
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tuner Standby</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <canvas
+        ref={canvasRef}
+        width={512}
+        height={140}
+        className="w-full h-32 bg-[#09090b]"
+      />
+    );
+  };
 
   return (
     <div className="bg-[#121214] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-6" id="radio-player-container">
@@ -326,27 +387,24 @@ export default function RadioPlayer() {
         <div className="lg:col-span-2 flex flex-col justify-between space-y-4">
           
           <div className="relative rounded-2xl overflow-hidden border border-white/10" id="radio-visualizer-card">
-            {/* Visualizer output canvas */}
-            <canvas
-              ref={canvasRef}
-              width={512}
-              height={140}
-              className="w-full h-32 bg-[#09090b]"
-            />
+            {/* Visualizer output or YouTube Embed */}
+            {renderVisualizerOrYoutube()}
             
             {/* Ambient overlay info */}
-            <div className="absolute right-4 top-4 text-right space-y-1">
-              <span className={`inline-flex items-center gap-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono transition-all duration-300 ${
-                isPlaying 
-                  ? (isBuffering 
-                      ? "bg-amber-950/40 text-amber-400 border border-amber-500/10 animate-pulse" 
-                      : "bg-emerald-950/40 text-emerald-400 border border-emerald-500/10")
-                  : "bg-slate-950/40 text-slate-400 border border-slate-500/10"
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? (isBuffering ? "bg-amber-400 animate-ping" : "bg-emerald-400") : "bg-slate-500"}`} />
-                <span>{isPlaying ? (isBuffering ? "CONNECTING..." : "LIVE STREAMING") : "TUNER STANDBY"}</span>
-              </span>
-            </div>
+            {!activeStation.isYoutube && (
+              <div className="absolute right-4 top-4 text-right space-y-1">
+                <span className={`inline-flex items-center gap-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono transition-all duration-300 ${
+                  isPlaying 
+                    ? (isBuffering 
+                        ? "bg-amber-950/40 text-amber-400 border border-amber-500/10 animate-pulse" 
+                        : "bg-emerald-950/40 text-emerald-400 border border-emerald-500/10")
+                    : "bg-slate-950/40 text-slate-400 border border-slate-500/10"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? (isBuffering ? "bg-amber-400 animate-ping" : "bg-emerald-400") : "bg-slate-500"}`} />
+                  <span>{isPlaying ? (isBuffering ? "CONNECTING..." : "LIVE STREAMING") : "TUNER STANDBY"}</span>
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Hidden HTML Audio tag linked with native event handlers */}
