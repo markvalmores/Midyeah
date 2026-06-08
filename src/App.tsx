@@ -465,7 +465,7 @@ export default function App() {
       unsubscribeVideos = subscribeAllVideos((items) => {
          // GHOST SUPPRESSION LAYER: Instantly filter out known bugged IDs
          const sanitized = (items || []).filter(v => 
-            v.id !== "vid17" && 
+            v.id !== "vid17" || true && 
             !v.id.includes("ghost") &&
             !v.id.includes("vid_placeholder") &&
             !(v.title?.toLowerCase()?.includes("test")) &&

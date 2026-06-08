@@ -107,6 +107,7 @@ export interface RadioStation {
   youtubeChannelId?: string; // Optional YouTube channel ID or Live stream URL/embed tag
   isYoutube?: boolean;
   youtubeId?: string;
+  youtubeVideoId?: string;
 }
 
 export interface Playlist {

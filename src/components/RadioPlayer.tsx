@@ -290,8 +290,10 @@ export default function RadioPlayer() {
 
   const renderVisualizerOrYoutube = () => {
     if (activeStation.isYoutube) {
-      const channelId = activeStation.youtubeChannelId || activeStation.youtubeId || "";
-      const embedUrl = `https://www.youtube.com/embed/live_stream?channel=${channelId}`;
+      const isVideo = !!activeStation.youtubeVideoId;
+      const embedUrl = isVideo 
+        ? `https://www.youtube.com/embed/${activeStation.youtubeVideoId}?si=7cLtSmqDatfpniCu`
+        : `https://www.youtube.com/embed/live_stream?channel=${activeStation.youtubeChannelId || activeStation.youtubeId || ""}`;
       
       return (
         <div className="w-full h-48 sm:h-64 bg-black relative" id="youtube-radio-container">
@@ -299,7 +301,7 @@ export default function RadioPlayer() {
             <iframe
               width="100%"
               height="100%"
-              src={`${embedUrl}&autoplay=1&mute=0`}
+              src={isVideo ? `${embedUrl}&autoplay=1` : `${embedUrl}&autoplay=1&mute=0`}
               title="YouTube Radio Live"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
