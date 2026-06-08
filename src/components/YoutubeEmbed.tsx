@@ -31,7 +31,8 @@ export default function YoutubeEmbed() {
           title="Isekai Worlds Embed"
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
           allowFullScreen
-          style={{ width: '100%', height: 'calc(100vh - 150px)', transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+          className="w-full h-full"
+          style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
         />
       </div>
     </div>
