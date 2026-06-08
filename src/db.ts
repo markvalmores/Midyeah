@@ -809,7 +809,7 @@ export async function saveVideo(video: Video, videoBlob?: Blob, onProgress?: (p:
 
 export function subscribeAllVideos(callback: (videos: Video[]) => void): () => void {
   const collRef = collection(db, "global_videos");
-  const q = query(collRef, limit(100)); // Optimization: Cap initial snapshot
+  const q = query(collRef); // Removed limit to fetch all videos
   return onSnapshot(q, async (snap) => {
     const remoteVideos: Video[] = [];
     snap.forEach(docSnap => {
@@ -914,7 +914,7 @@ export async function getAllVideos(): Promise<Video[]> {
   const remoteVideos: Video[] = [];
   try {
     const collRef = collection(db, "global_videos");
-    const q = query(collRef, limit(100)); // Limit to prevent quota drain
+    const q = query(collRef); // Removed limit to fetch all videos
     const snap = await getDocs(q);
     snap.forEach(docSnap => {
       const dv = docSnap.data();

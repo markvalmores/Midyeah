@@ -28,7 +28,7 @@ export const RADIO_STATIONS: RadioStation[] = [
   { id: "ph_davao_mor", name: "MOR 101.1 Davao", genre: "Davao Hits", streamUrl: "https://stream.zeno.fm/3fscq7nt3veuv", logo: "🍈", country: "philippines" },
   { id: "ph_spirit", name: "Spirit FM 99.1", genre: "Catholic Radio", streamUrl: "https://stream.zeno.fm/8qscq7nt3veuu", logo: "🕊️", country: "philippines" },
   { id: "ph_dzbb", name: "Super Radyo DZBB", genre: "News & Talk", streamUrl: "https://stream.zeno.fm/dw2e24shs8uv", logo: "🏙️", country: "philippines" },
-  { id: "ph_dzmm", name: "DZMM Teleradyo", genre: "News", streamUrl: "https://www.youtube.com/@DZMMTeleRadyo_MSPC", logo: "📺", country: "philippines", isYoutube: true, youtubeChannelId: "UCv-mO10hZ0_RMT5_206B_07Yw" },
+  { id: "ph_dzmm", name: "DZMM Teleradyo", genre: "News", streamUrl: "https://www.youtube.com/watch?v=QVPTp69f4Sw", logo: "📺", country: "philippines", isYoutube: true, youtubeChannelId: "UCv-mO10hZ0_RMT5_206B_07Yw" },
   { id: "ph_brgy_cebu", name: "Barangay RT Cebu", genre: "Visayan Pop", streamUrl: "https://stream.zeno.fm/2fscq7nt3veuv", logo: "🕺", country: "philippines" },
   { id: "ph_monster_cebu", name: "Monster Radio BT 105.9", genre: "Pop", streamUrl: "https://stream.zeno.fm/u8vkq7nt3veuv", logo: "👾", country: "philippines" },
   { id: "ph_energy_cebu", name: "Energy FM Cebu", genre: "Pop", streamUrl: "https://stream.zeno.fm/a7fscq7nt3veuv", logo: "⚡", country: "philippines" },

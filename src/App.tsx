@@ -640,6 +640,7 @@ export default function App() {
       localStorage.setItem("midyeah_active_session_email", emailInput);
       setCurrUser(profile);
       setStepAuth("loggedIn");
+      reloadVideos();
     } catch (err: any) {
       console.error("Login failed:", err);
       alert(`Login Error: ${err.message || err}`);
@@ -675,6 +676,7 @@ export default function App() {
       localStorage.setItem("midyeah_active_session_email", guestEmail);
       setCurrUser(profile);
       setStepAuth("loggedIn");
+      reloadVideos();
     } catch (err: any) {
       console.error("Guest login failed:", err);
       alert("Failed to sign in as guest.");
@@ -726,6 +728,7 @@ export default function App() {
         // Instant transition
         setCurrUser(prof);
         setStepAuth("loggedIn");
+        reloadVideos();
         setShowTutorial(false);
       } catch (err: any) {
         setIsVerifying(false);
