@@ -1025,10 +1025,7 @@ export async function deleteVideo(id: string): Promise<void> {
 
   // Remote Firestore delete - Await this to ensure "hard-code delete" as requested
   try {
-    const docRef = doc(db, "global_videos", id);
-    await deleteDoc(docRef);
-    
-    // Also delete chunks to free up space and ensure permanent removal
+    // 1. Delete chunks subcollection first (before deleting parent, due to security rules dependency)
     const chunksColl = collection(db, "global_videos", id, "chunks");
     const chunksSnap = await getDocs(chunksColl);
     const batch = writeBatch(db);
@@ -1037,7 +1034,7 @@ export async function deleteVideo(id: string): Promise<void> {
     });
     await batch.commit();
     
-    // Delete comments associated with this video
+    // 2. Delete comments subcollection second (before deleting parent)
     const commentsColl = collection(db, "global_videos", id, "comments");
     const commentsSnap = await getDocs(commentsColl);
     const commBatch = writeBatch(db);
@@ -1045,6 +1042,10 @@ export async function deleteVideo(id: string): Promise<void> {
       commBatch.delete(cDoc.ref);
     });
     await commBatch.commit();
+
+    // 3. Finally, delete the parent global_videos document
+    const docRef = doc(db, "global_videos", id);
+    await deleteDoc(docRef);
 
   } catch (err: any) {
     if (err.message && (err.message.includes("resource-exhausted") || err.code === "resource-exhausted")) {
