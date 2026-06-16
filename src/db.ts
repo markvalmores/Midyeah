@@ -1052,6 +1052,7 @@ export async function deleteVideo(id: string): Promise<void> {
       setTimeout(() => { isSyncStabilized = true; }, 60000 * 5);
     }
     console.error("Could not delete from global network:", err);
+    throw err;
   }
 }
 

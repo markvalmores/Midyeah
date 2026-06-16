@@ -216,43 +216,16 @@ export default function App() {
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
 
-  // HARDCORE ERADICATOR: Specifically target persistent ghost or test videos
-  useEffect(() => {
-    if (videosList.length > 0) {
-      // SUSPICIOUS_LOGIC: Target "Test", "Untitled", or ghost-prefixed videos
-      // We eradicate any "Test" video instantly and aggressively. 
-      const toEliminate = videosList.filter(v => 
-        v.id === "vid17" ||
-        (v.title === "Untitled Presentation" && !v.blob && v.source === "local") ||
-        (v.title && v.title.toLowerCase().includes("test")) ||
-        v.id.includes("ghost") || 
-        v.id.includes("vid_placeholder")
-      );
-      
-      if (toEliminate.length > 0) {
-        console.log(`[Eradicator] Hard-killing ${toEliminate.length} persistent ghost videos...`);
-        toEliminate.forEach(v => {
-           deleteVideo(v.id).then(() => {
-              setVideosList(prev => prev.filter(item => item.id !== v.id));
-              console.log(`[Eradicator] Permanently purged: ${v.id} (${v.title})`);
-           }).catch(e => {
-             console.warn("Eradicator failure for video:", v.id, e);
-             // Aggressive retry: Force delete locally if network fails
-             setVideosList(prev => prev.filter(item => item.id !== v.id));
-           });
-        });
-      }
-    }
-  }, [videosList]);
-
   const handleDeleteSingleVideo = async (id: string) => {
     try {
       await deleteVideo(id);
       if (currentVideo?.id === id) {
         setCurrentVideo(null);
       }
-    } catch (err) {
+      showNotification("✨ Video successfully deleted from local and global cloud.");
+    } catch (err: any) {
       console.error("Deletion error:", err);
+      showNotification(`❌ Failed to delete video: ${err.message || 'Unauthorized action'}`);
     } finally {
       setDeletingVideoId(null);
       reloadVideos();
@@ -264,9 +237,11 @@ export default function App() {
       await clearAllVideos();
       setCurrentVideo(null);
       setShowConfirmDeleteAll(false);
+      showNotification("✨ All videos have been cleared successfully.");
       reloadVideos();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      showNotification(`❌ Failed to clear videos: ${err.message || 'Permission Denied'}`);
     }
   };
 
@@ -296,9 +271,24 @@ export default function App() {
 
   // Sync / Stream Video from Firestore chunks globally
   const handlePlayVideo = async (vid: Video) => {
-    if (vid.isOffline || vid.blob || vid.videoUrl.startsWith("blob:") || vid.videoUrl.startsWith("data:")) {
+    // 1. Play directly if it's a YouTube video link
+    if (vid.source === "youtube") {
       setCurrentVideo(vid);
-    } else {
+    } 
+    // 2. Play directly if the raw blob is already loaded in UI memory
+    else if (vid.blob) {
+      setCurrentVideo(vid);
+    } 
+    // 3. Play directly if the video is marked offline and has local URL
+    else if (vid.isOffline && vid.videoUrl) {
+      setCurrentVideo(vid);
+    }
+    // 4. Play directly if it's a normal web direct link (not a local session blob/data IRI)
+    else if (vid.videoUrl && vid.videoUrl.startsWith("http") && !vid.videoUrl.startsWith("blob:")) {
+      setCurrentVideo(vid);
+    } 
+    // 5. Otherwise, we do not have the file cached locally. We must download from global Firestore chunk cluster.
+    else {
       setIsStreaming(true);
       try {
         const { downloadGlobalVideoChunks } = await import("./db");
@@ -307,7 +297,8 @@ export default function App() {
         const hydratedVideo: Video = {
           ...vid,
           videoUrl: url,
-          blob: blob
+          blob: blob,
+          isOffline: true
         };
         setCurrentVideo(hydratedVideo);
       } catch (err) {
@@ -465,7 +456,7 @@ export default function App() {
       unsubscribeVideos = subscribeAllVideos((items) => {
          // GHOST SUPPRESSION LAYER: Instantly filter out known bugged IDs
          const sanitized = (items || []).filter(v => 
-            v.id !== "vid17" || true && 
+            v.id !== "vid17" && 
             !v.id.includes("ghost") &&
             !v.id.includes("vid_placeholder") &&
             !(v.title?.toLowerCase()?.includes("test")) &&
@@ -594,8 +585,15 @@ export default function App() {
 
   const reloadVideos = () => {
     getAllVideos().then((items) => {
-      setVideosList(items || []);
-      const savedOfflines = items.filter(v => v.isOffline).map(v => v.id);
+      const sanitized = (items || []).filter(v => 
+         v.id !== "vid17" && 
+         !v.id.includes("ghost") &&
+         !v.id.includes("vid_placeholder") &&
+         !(v.title?.toLowerCase()?.includes("test")) &&
+         !(v.title?.toLowerCase()?.includes("untitled presentation"))
+      );
+      setVideosList(sanitized);
+      const savedOfflines = sanitized.filter(v => v.isOffline).map(v => v.id);
       setDownloadedIds(savedOfflines);
     });
   };
