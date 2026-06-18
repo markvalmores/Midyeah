@@ -133,6 +133,73 @@ Ensure sufficient contrast against text!`;
     }
   });
 
+  app.post("/api/moderate-video", async (req, res) => {
+    try {
+      const { title, description, thumbnailUrl, creatorEmail } = req.body;
+
+      if (creatorEmail === "mdv4244@gmail.com") {
+        return res.json({ flagged: false, reason: "Admin bypass allowed." });
+      }
+
+      const prompt = `You are an AI Content Moderator for MidYeah video sharing platform.
+Review the following video request for any content that is NSFW (not safe for work), 18+, nudity, underwear/semi-nudity exposure, sexual acts, or extreme/explicit adult material.
+
+Video Details:
+Title: "${title || ''}"
+Description: "${description || ''}"
+
+If the title or description contains explicit sexual words/phrases, or if the accompanying thumbnail image contains nudity, semi-nudity, underwear, sexual acts, or pornography, you MUST flag it as NSFW (flagged: true).
+If the content is friendly, standard, gaming, anime, regular movies, or typical clean content, flag it as clean (flagged: false).
+
+Respond ONLY with this JSON object schema:
+{
+  "flagged": boolean,
+  "reason": "Explain briefly why the content was flagged, or return empty string if clean."
+}`;
+
+      const parts: any[] = [];
+
+      if (thumbnailUrl && thumbnailUrl.startsWith("data:image/")) {
+        const mimeType = thumbnailUrl.substring(thumbnailUrl.indexOf(":") + 1, thumbnailUrl.indexOf(";"));
+        const base64Data = thumbnailUrl.split(",")[1];
+        if (base64Data) {
+          parts.push({
+            inlineData: {
+              mimeType: mimeType || "image/png",
+              data: base64Data,
+            }
+          });
+        }
+      }
+
+      parts.push({ text: prompt });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: {
+          parts: parts,
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              flagged: { type: Type.BOOLEAN },
+              reason: { type: Type.STRING },
+            },
+            required: ["flagged", "reason"],
+          },
+        },
+      });
+
+      const result = JSON.parse(response.text);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Moderation error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
   // Vite Middleware
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

@@ -425,6 +425,57 @@ export async function deleteProfileFromDb(email: string): Promise<void> {
   }
 }
 
+/**
+ * Bans a user and completely erases their account, files, and traces.
+ */
+export async function banUserAndEraseAccount(email: string): Promise<void> {
+  if (email === "mdv4244@gmail.com") {
+    throw new Error("Cannot ban the admin.");
+  }
+
+  try {
+    // 1. Mark as banned in firestore
+    const banRef = doc(db, "banned_emails", email);
+    await setDoc(banRef, { banned: true, bannedAt: new Date().toISOString() });
+
+    // 2. Erase user profile
+    await deleteProfileFromDb(email);
+
+    // 3. Find and erase all videos uploaded by this user
+    const videosColl = collection(db, "global_videos");
+    const qVideos = query(videosColl, where("creatorEmail", "==", email));
+    const videosSnap = await getDocs(qVideos);
+    for (const vDoc of videosSnap.docs) {
+      await deleteVideo(vDoc.id);
+    }
+
+    // 4. Clean up any of their playlists
+    const playlistsColl = collection(db, "playlists");
+    const qPlaylists = query(playlistsColl, where("ownerEmail", "==", email));
+    const playlistsSnap = await getDocs(qPlaylists);
+    for (const pDoc of playlistsSnap.docs) {
+      await deleteDoc(pDoc.ref);
+    }
+  } catch (err) {
+    console.error("Error banning user and erasing account:", err);
+    throw err;
+  }
+}
+
+/**
+ * Checks if a user is banned.
+ */
+export async function isUserBanned(email: string): Promise<boolean> {
+  if (!email || email === "guest@midyeah.com" || email === "mdv4244@gmail.com") return false;
+  try {
+    const banDoc = await getDoc(doc(db, "banned_emails", email));
+    return banDoc.exists();
+  } catch (err: any) {
+    console.warn("Notice: isUserBanned lookup handled or status check unavailable:", err?.message || err);
+    return false;
+  }
+}
+
 // Global Sync state: Internally managed to optimize performance
 let isSyncStabilized = true;
 
@@ -1043,7 +1094,62 @@ export async function deleteVideo(id: string): Promise<void> {
     });
     await commBatch.commit();
 
-    // 3. Finally, delete the parent global_videos document
+    // 3. Delete associated likes/dislikes
+    try {
+      const likesColl = collection(db, "likes_dislikes");
+      const likesQ = query(likesColl, where("videoId", "==", id));
+      const likesSnap = await getDocs(likesQ);
+      if (!likesSnap.empty) {
+        const likesBatch = writeBatch(db);
+        likesSnap.forEach(lDoc => {
+          likesBatch.delete(lDoc.ref);
+        });
+        await likesBatch.commit();
+      }
+    } catch (likesErr) {
+      console.warn("Error deleting likes_dislikes documents for video:", likesErr);
+    }
+
+    // 4. Delete associated video reactions
+    try {
+      const reactsColl = collection(db, "video_reactions");
+      const reactsQ = query(reactsColl, where("videoId", "==", id));
+      const reactsSnap = await getDocs(reactsQ);
+      if (!reactsSnap.empty) {
+        const reactsBatch = writeBatch(db);
+        reactsSnap.forEach(rDoc => {
+          reactsBatch.delete(rDoc.ref);
+        });
+        await reactsBatch.commit();
+      }
+    } catch (reactsErr) {
+      console.warn("Error deleting video_reactions documents for video:", reactsErr);
+    }
+
+    // 5. Remove video ID from all playlists
+    try {
+      const playlistsColl = collection(db, "playlists");
+      const playlistsSnap = await getDocs(playlistsColl);
+      const playlistBatch = writeBatch(db);
+      let updatedCount = 0;
+      playlistsSnap.forEach(pDoc => {
+        const data = pDoc.data();
+        const videoIds = data.videoIds || [];
+        if (videoIds.includes(id)) {
+          playlistBatch.update(pDoc.ref, {
+            videoIds: videoIds.filter((vId: string) => vId !== id)
+          });
+          updatedCount++;
+        }
+      });
+      if (updatedCount > 0) {
+        await playlistBatch.commit();
+      }
+    } catch (playlistErr) {
+      console.warn("Error clearing video from playlists:", playlistErr);
+    }
+
+    // 6. Finally, delete the parent global_videos document
     const docRef = doc(db, "global_videos", id);
     await deleteDoc(docRef);
 

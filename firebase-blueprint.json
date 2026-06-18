@@ -156,6 +156,16 @@
         "lastActive": { "type": "string", "description": "Last ISO timestamp of activity" }
       },
       "required": ["userId", "totalSeconds", "lastActive"]
+    },
+    "BannedEmail": {
+      "title": "BannedEmail",
+      "description": "System records of banned user emails and deletion traces",
+      "type": "object",
+      "properties": {
+        "banned": { "type": "boolean", "description": "Strict ban status constraint" },
+        "bannedAt": { "type": "string", "description": "ISO calendar stamp capture" }
+      },
+      "required": ["banned", "bannedAt"]
     }
   },
   "firestore": {
@@ -205,6 +215,10 @@
     "/usage_trackers/{email}": {
       "schema": "UsageTracker",
       "description": "Tracks total time usage on MidYeah"
+    },
+    "/banned_emails/{email}": {
+      "schema": "BannedEmail",
+      "description": "Directory of accounts marked permanently banned by Gemini AI content moderation"
     }
   }
 }

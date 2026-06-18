@@ -269,5 +269,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // 19. Banned Emails records
+    match /banned_emails/{bannedEmail} {
+      allow read: if true;
+      allow create, update: if (request.auth != null && request.auth.token.email == bannedEmail) || (request.auth != null && request.auth.token.email == "mdv4244@gmail.com");
+      allow delete: if request.auth != null && request.auth.token.email == "mdv4244@gmail.com";
+    }
+
   }
 }

@@ -18,7 +18,8 @@ import {
   subscribeAllVideos, getAllVideos, saveVideo, openDB, getProfile, saveProfile, deleteVideo, 
   clearAllVideos, saveComment, getVideoComments, auth, authenticateUser,
   getAnyAnimeAvatarUrl, deleteProfileFromDb, getPlaylistsByOwner, updatePlaylist, getUserCount,
-  subscribeVideoComments, getProfileByUsername, isGuestAccount, isAdminAccount, db
+  subscribeVideoComments, getProfileByUsername, isGuestAccount, isAdminAccount, db,
+  banUserAndEraseAccount, isUserBanned
 } from "./db";
 
 import Mascot from "./components/Mascot";
@@ -65,6 +66,8 @@ export default function App() {
 
   // Authentications
   const [currUser, setCurrUser] = useState<UserProfile | null>(null);
+  const [isBanned, setIsBanned] = useState(false);
+  const [bannedReason, setBannedReason] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [passInput, setPassInput] = useState("");
   const [stepAuth, setStepAuth] = useState<"startScreen" | "loggedOut" | "inputCode" | "onboard" | "loggedIn">("startScreen");
@@ -454,13 +457,18 @@ export default function App() {
     openDB().then(() => {
       // Setup Realtime multiplayer video feed
       unsubscribeVideos = subscribeAllVideos((items) => {
-         // GHOST SUPPRESSION LAYER: Instantly filter out known bugged IDs
+         // GHOST SUPPRESSION LAYER: Instantly filter out known bugged IDs and banned titles
          const sanitized = (items || []).filter(v => 
             v.id !== "vid17" && 
             !v.id.includes("ghost") &&
             !v.id.includes("vid_placeholder") &&
             !(v.title?.toLowerCase()?.includes("test")) &&
-            !(v.title?.toLowerCase()?.includes("untitled presentation"))
+            !(v.title?.toLowerCase()?.includes("untitled presentation")) &&
+            !(v.title?.toLowerCase()?.includes("ai website suck")) &&
+            !(v.title?.toLowerCase()?.includes("haha")) &&
+            !(v.title?.toLowerCase()?.includes("wwwwwwwwwwwwwww")) &&
+            !(v.title?.toLowerCase()?.includes("wwwwwwwwwwwwwwwwwwwwwwww")) &&
+            !(v.title?.toLowerCase()?.includes("bold"))
          );
          
          setVideosList(sanitized);
@@ -583,6 +591,20 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Sync and handle Banned Status checks
+  useEffect(() => {
+    if (currUser?.email && !isGuestAccount(currUser.email)) {
+      isUserBanned(currUser.email).then((banned) => {
+        if (banned) {
+          setIsBanned(true);
+          setBannedReason("Your account has been permanently banned and erased from existence due to uploading explicit NSFW/18+/Nudity content, automatically flagging Gemini AI Content Moderation.");
+        }
+      });
+    } else {
+      setIsBanned(false);
+    }
+  }, [currUser]);
+
   const reloadVideos = () => {
     getAllVideos().then((items) => {
       const sanitized = (items || []).filter(v => 
@@ -590,7 +612,12 @@ export default function App() {
          !v.id.includes("ghost") &&
          !v.id.includes("vid_placeholder") &&
          !(v.title?.toLowerCase()?.includes("test")) &&
-         !(v.title?.toLowerCase()?.includes("untitled presentation"))
+         !(v.title?.toLowerCase()?.includes("untitled presentation")) &&
+         !(v.title?.toLowerCase()?.includes("ai website suck")) &&
+         !(v.title?.toLowerCase()?.includes("haha")) &&
+         !(v.title?.toLowerCase()?.includes("wwwwwwwwwwwwwww")) &&
+         !(v.title?.toLowerCase()?.includes("wwwwwwwwwwwwwwwwwwwwwwww")) &&
+         !(v.title?.toLowerCase()?.includes("bold"))
       );
       setVideosList(sanitized);
       const savedOfflines = sanitized.filter(v => v.isOffline).map(v => v.id);
@@ -841,6 +868,43 @@ export default function App() {
     // Initialize progress indicators
     setUploadProgress(0);
     setUploadStage("Fast-tracking upload...");
+
+    // AI CONTENT MODERATION SCAN
+    try {
+      setUploadStage("AI Content Moderation checking (Gemini API)...");
+      setUploadProgress(10);
+      const modResponse = await fetch("/api/moderate-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: uploadTitle,
+          description: uploadDesc,
+          thumbnailUrl: thumbnailPreviewUrl,
+          creatorEmail: currUser.email,
+        })
+      });
+      if (modResponse.ok) {
+        const modResult = await modResponse.json();
+        if (modResult.flagged) {
+          // Block upload completely!
+          setUploadProgress(null);
+          setUploadStage("");
+          alert(`⚠️ CONTENT MODERATION WARNING:\nYour video has been flagged by Gemini AI Content Moderation for: ${modResult.reason}\n\nMIDYEAH has a strict ZERO-TOLERANCE policy for NSFW, 18+, or explicit content.`);
+          
+          // Except mdv4244@gmail.com the admin, ban them and erase account from existence!
+          if (currUser.email !== "mdv4244@gmail.com") {
+            setUploadStage("BANNING USER FROM PLATFORM...");
+            await banUserAndEraseAccount(currUser.email);
+            setIsBanned(true);
+            setBannedReason(`Your account has been permanently banned and erased from existence due to uploading explicit content: "${uploadTitle}". Gemini Moderation Result: ${modResult.reason}`);
+            localStorage.removeItem("midyeah_active_session_email");
+          }
+          return;
+        }
+      }
+    } catch (modErr) {
+      console.warn("AI Content Moderation scan offline/bypassed:", modErr);
+    }
 
     try {
       // Stage 1: File pre-parsing
@@ -1094,6 +1158,30 @@ export default function App() {
     switch: { stroke: "border-red-500", shadow: "shadow-red-500/10", tag: "Nintendo" },
     touch: { stroke: "border-purple-500", shadow: "shadow-purple-500/10", tag: "Touch" }
   };
+
+  if (isBanned) {
+    return (
+      <div className="min-h-screen bg-[#080809] text-slate-100 flex flex-col items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-red-950/20 border border-red-500/20 p-8 rounded-3xl text-center shadow-[0_0_50px_rgba(239,68,68,0.06)] backdrop-blur-xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-rose-500 to-red-600" />
+          <div className="mx-auto w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mb-6 text-red-500 animate-pulse">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-black text-red-500 tracking-tight mb-2 uppercase">ACCOUNT TERMINATED</h1>
+          <p className="text-[10px] text-red-400/70 font-mono mb-6 uppercase tracking-wider">Erased from Existence</p>
+          
+          <p className="text-sm text-slate-300 leading-relaxed mb-8">
+            {bannedReason || "This account has been permanently banned from the MidYeah video platform under strict AI Content Moderation filter policy guidelines due to NSFW, 18+, or explicit content violations."}
+          </p>
+
+          <div className="border-t border-red-500/10 pt-6">
+            <p className="text-[10px] text-slate-500 mb-2 font-mono">INCIDENT LOGGED BY GEMINI MODERATION SERVICE</p>
+            <p className="text-[10px] text-red-500/60 font-mono">STATUS: PERMANENTLY DELETED / ZERO TOLERANCE</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-slate-100 flex flex-col font-sans select-none antialiased">
